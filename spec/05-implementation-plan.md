@@ -6,11 +6,13 @@
 
 **作業**
 - `vite.config.ts` に `css: { modules: { localsConvention: 'camelCaseOnly' } }` を追加
+- `vite.config.ts` に `test: { environment: 'node' }` を追加（vite-plugin-solid が既定で jsdom 環境を選ぶが jsdom は未インストール。エンジンテストは node 環境で走らせる — spec/06 参照）
 - スターターのデモコード（`App.tsx` / `App.css` / `assets/` の不要分）を削除・置換
+- スターターの `public/` アセット（`favicon.svg` / `icons.svg`）を差し替えまたは削除（Biome の a11y ルール `noSvgWithoutTitle` に引っかかり `pnpm check` が通らないため）
 - `index.css` にリセット・dvh レイアウト・テーマ CSS 変数の骨格
 - ディレクトリ作成（engine / game / render / store / components / styles）
 
-**検証**: `pnpm dev` で空のレイアウト骨格が表示され、`pnpm check` が通る
+**検証**: `pnpm dev` で空のレイアウト骨格が表示され、`pnpm check` が通る（`pnpm test` はテストが存在しないため vitest が exit 1 になる — テストゲートはフェーズ 1 から）
 
 ## フェーズ 1: エンジン純関数 + テスト（ゲームの心臓）
 

@@ -98,5 +98,6 @@ pnpm test          # vitest run（CI / pre-push 想定）
 pnpm vitest        # watch モード（開発中）
 ```
 
-- vitest 設定は追加不要（純 TS・node 環境で動く）。必要になったら `vite.config.ts` に `test` ブロックを足す
+- `vite.config.ts` に `test: { environment: 'node' }` を明示する（フェーズ 0 で設定）。vite-plugin-solid が既定で jsdom 環境を要求するが jsdom は未インストールで、テスト対象は純 TS のため node 環境で十分
+- テストが 1 つも存在しない状態では `vitest run` は exit 1 になる（`pnpm test` のゲートはフェーズ 1 から有効）
 - lefthook の pre-commit は Biome、テストはフェーズゲート（[05-implementation-plan.md](./05-implementation-plan.md)）で必ず全緑にしてから次フェーズへ進む
