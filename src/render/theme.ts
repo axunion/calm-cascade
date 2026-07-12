@@ -1,0 +1,124 @@
+import { GEM_KINDS } from "../engine/board.ts";
+
+export type ThemeMode = "dark" | "light";
+
+export interface Theme {
+  boardTileA: string;
+  boardTileB: string;
+  selectionRing: string;
+  gemColors: string[];
+}
+
+const LIGHT_THEME: Theme = {
+  boardTileA: "#efeaf5",
+  boardTileB: "#e6dff0",
+  selectionRing: "#aa3bff",
+  gemColors: ["#f28b9d", "#f5b46a", "#f2d675", "#9ed6a0", "#8fc7ea", "#c6a6e0"],
+};
+
+const DARK_THEME: Theme = {
+  boardTileA: "#1f2028",
+  boardTileB: "#262834",
+  selectionRing: "#c084fc",
+  gemColors: ["#e07a90", "#e0a25f", "#e0c869", "#7fbf8a", "#7ab3d9", "#b494d6"],
+};
+
+export function getTheme(mode: ThemeMode): Theme {
+  return mode === "dark" ? DARK_THEME : LIGHT_THEME;
+}
+
+// One Path2D shape per gem kind (spec/03 §6: color + shape are both always
+// drawn, so color-blind players can tell gems apart without relying on hue).
+// Centered at the origin; callers translate to the gem's screen position.
+type ShapeBuilder = (cellSize: number) => Path2D;
+
+const SHAPE_BUILDERS: ShapeBuilder[] = [
+  circlePath,
+  trianglePath,
+  squarePath,
+  diamondPath,
+  starPath,
+  dropPath,
+];
+
+// Cached per (kind, cellSize): cellSize only changes on resize, so this
+// keeps the rAF render loop allocation-free (spec/04 §4).
+const shapeCache = new Map<number, Path2D>();
+let shapeCacheCellSize = -1;
+
+export function gemShapePath(kind: number, cellSize: number): Path2D {
+  if (cellSize !== shapeCacheCellSize) {
+    shapeCache.clear();
+    shapeCacheCellSize = cellSize;
+  }
+  let path = shapeCache.get(kind);
+  if (!path) {
+    const builder = SHAPE_BUILDERS[kind % GEM_KINDS];
+    path = builder(cellSize);
+    shapeCache.set(kind, path);
+  }
+  return path;
+}
+
+function circlePath(cellSize: number): Path2D {
+  const path = new Path2D();
+  path.arc(0, 0, cellSize * 0.36, 0, Math.PI * 2);
+  return path;
+}
+
+function trianglePath(cellSize: number): Path2D {
+  const r = cellSize * 0.4;
+  const path = new Path2D();
+  path.moveTo(0, -r);
+  path.lineTo(r * 0.87, r * 0.5);
+  path.lineTo(-r * 0.87, r * 0.5);
+  path.closePath();
+  return path;
+}
+
+function squarePath(cellSize: number): Path2D {
+  const r = cellSize * 0.32;
+  const path = new Path2D();
+  path.rect(-r, -r, r * 2, r * 2);
+  return path;
+}
+
+function diamondPath(cellSize: number): Path2D {
+  const r = cellSize * 0.38;
+  const path = new Path2D();
+  path.moveTo(0, -r);
+  path.lineTo(r, 0);
+  path.lineTo(0, r);
+  path.lineTo(-r, 0);
+  path.closePath();
+  return path;
+}
+
+function starPath(cellSize: number): Path2D {
+  const outer = cellSize * 0.4;
+  const inner = outer * 0.45;
+  const path = new Path2D();
+  for (let i = 0; i < 10; i++) {
+    const radius = i % 2 === 0 ? outer : inner;
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.closePath();
+  return path;
+}
+
+function dropPath(cellSize: number): Path2D {
+  const r = cellSize * 0.34;
+  const path = new Path2D();
+  path.moveTo(0, -r * 1.3);
+  path.quadraticCurveTo(r * 1.1, r * 0.3, 0, r);
+  path.quadraticCurveTo(-r * 1.1, r * 0.3, 0, -r * 1.3);
+  path.closePath();
+  return path;
+}
