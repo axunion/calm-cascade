@@ -1,26 +1,29 @@
 import { BOARD_SIZE, type Cell } from "../engine/board.ts";
 import type { Sprite } from "../game/animations.ts";
-import { gemShapePath, type Theme } from "./theme.ts";
+import { type BeamEffect, drawBeams } from "./effects.ts";
+import { gemShapePath, laserArrowPath, type Theme } from "./theme.ts";
 
 export interface RenderOptions {
   cellSize: number;
   theme: Theme;
   selected: Cell | null;
+  beams: readonly BeamEffect[];
 }
 
-// Draw order per spec/04 §1.3 (shake/beam/particles land in later phases):
-// clear -> board background -> gem sprites -> selection ring.
+// Draw order per spec/04 §1.3 (shake/particles land in a later phase):
+// clear -> board background -> gem sprites -> laser beams -> selection ring.
 export function renderBoard(
   ctx: CanvasRenderingContext2D,
   sprites: ReadonlyMap<number, Sprite>,
   options: RenderOptions,
 ): void {
-  const { cellSize, theme, selected } = options;
+  const { cellSize, theme, selected, beams } = options;
   const boardPx = cellSize * BOARD_SIZE;
 
   ctx.clearRect(0, 0, boardPx, boardPx);
   drawBackground(ctx, theme, cellSize);
   drawGems(ctx, sprites, theme, cellSize);
+  drawBeams(ctx, beams, theme, cellSize);
   if (selected) {
     drawSelectionRing(ctx, selected, theme, cellSize);
   }
@@ -63,8 +66,27 @@ function drawGems(
     }
     ctx.fillStyle = theme.gemColors[sprite.kind];
     ctx.fill(gemShapePath(sprite.kind, cellSize));
+    if (sprite.special !== "none") {
+      drawLaserArrow(ctx, sprite.special === "laserH" ? "h" : "v", cellSize);
+    }
     ctx.restore();
   });
+}
+
+// Stroked in a fixed near-white so the sweep axis reads over any gem color
+// (spec/03 color-blind support pairs shape with a color-independent cue).
+function drawLaserArrow(
+  ctx: CanvasRenderingContext2D,
+  orientation: "h" | "v",
+  cellSize: number,
+): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = Math.max(1.5, cellSize * 0.05);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke(laserArrowPath(orientation, cellSize));
+  ctx.restore();
 }
 
 function drawSelectionRing(

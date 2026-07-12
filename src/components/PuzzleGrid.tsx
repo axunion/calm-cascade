@@ -61,6 +61,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
       cellSize: 0,
       theme: getTheme(loop.settingsSnapshot.theme),
       selected: null,
+      beams: loop.beams,
     };
 
     // Bridge from the reactive store to the non-reactive rAF loop (spec/02

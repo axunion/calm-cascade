@@ -24,6 +24,7 @@ export interface Tween {
   duration: number;
   ease: EaseFn;
   onDone?: () => void;
+  delay: number;
 }
 
 export function linear(t: number): number {
@@ -57,6 +58,7 @@ export function tweenTo(
   duration: number,
   ease: EaseFn,
   onDone?: () => void,
+  delay = 0,
 ): Tween {
   return {
     sprite,
@@ -67,6 +69,7 @@ export function tweenTo(
     duration,
     ease,
     onDone,
+    delay,
   };
 }
 
@@ -79,11 +82,14 @@ export interface TweenStep {
 
 // Chains steps for one sprite via onDone, so a call site describes a
 // sequence declaratively instead of hand-nesting onDone callbacks.
+// `initialDelay` (spec/04 §2.5 laser sweep stagger) only holds up the first
+// step - once it starts, the rest of the sequence follows immediately.
 export function tweenSequence(
   tweens: Tween[],
   sprite: Sprite,
   steps: TweenStep[],
   onDone?: () => void,
+  initialDelay = 0,
 ): void {
   if (steps.length === 0) {
     onDone?.();
@@ -93,13 +99,21 @@ export function tweenSequence(
     const step = steps[index];
     const isLast = index === steps.length - 1;
     tweens.push(
-      tweenTo(sprite, step.prop, step.to, step.duration, step.ease, () => {
-        if (isLast) {
-          onDone?.();
-        } else {
-          pushStep(index + 1);
-        }
-      }),
+      tweenTo(
+        sprite,
+        step.prop,
+        step.to,
+        step.duration,
+        step.ease,
+        () => {
+          if (isLast) {
+            onDone?.();
+          } else {
+            pushStep(index + 1);
+          }
+        },
+        index === 0 ? initialDelay : 0,
+      ),
     );
   }
   pushStep(0);
@@ -110,6 +124,10 @@ export function tweenSequence(
 export function updateTweens(tweens: Tween[], dt: number): void {
   for (let i = tweens.length - 1; i >= 0; i--) {
     const tween = tweens[i];
+    if (tween.delay > 0) {
+      tween.delay -= dt;
+      continue;
+    }
     tween.elapsed += dt;
     const t =
       tween.duration <= 0 ? 1 : Math.min(1, tween.elapsed / tween.duration);

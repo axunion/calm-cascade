@@ -122,3 +122,49 @@ function dropPath(cellSize: number): Path2D {
   path.closePath();
   return path;
 }
+
+// Double-headed arrow drawn on top of a laser gem's shape (spec/01 §4.3,
+// spec/03 color-blind support): the sweep axis is legible independent of
+// color, the same way gem shapes stand in for kind.
+export type LaserOrientation = "h" | "v";
+
+// Only two orientations ever exist, so a pair of slots is enough - no need
+// for gemShapePath's Map (which keys on the much larger set of gem kinds).
+let cachedH: Path2D | null = null;
+let cachedV: Path2D | null = null;
+let laserArrowCacheCellSize = -1;
+
+export function laserArrowPath(
+  orientation: LaserOrientation,
+  cellSize: number,
+): Path2D {
+  if (cellSize !== laserArrowCacheCellSize) {
+    cachedH = null;
+    cachedV = null;
+    laserArrowCacheCellSize = cellSize;
+  }
+  if (orientation === "h") {
+    cachedH ??= axisArrowPath(cellSize, true);
+    return cachedH;
+  }
+  cachedV ??= axisArrowPath(cellSize, false);
+  return cachedV;
+}
+
+function axisArrowPath(cellSize: number, horizontal: boolean): Path2D {
+  const half = cellSize * 0.34;
+  const head = cellSize * 0.1;
+  const path = new Path2D();
+  const point = (along: number, across: number) =>
+    horizontal ? ([along, across] as const) : ([across, along] as const);
+
+  path.moveTo(...point(-half, 0));
+  path.lineTo(...point(half, 0));
+  path.moveTo(...point(half - head, -head));
+  path.lineTo(...point(half, 0));
+  path.lineTo(...point(half - head, head));
+  path.moveTo(...point(-half + head, -head));
+  path.lineTo(...point(-half, 0));
+  path.lineTo(...point(-half + head, head));
+  return path;
+}

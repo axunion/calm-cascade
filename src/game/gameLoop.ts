@@ -2,6 +2,7 @@ import {
   BOARD_SIZE,
   type Board,
   type Cell,
+  cellsEqual,
   createIdGenerator,
   type Gem,
   hasValidMove,
@@ -13,6 +14,11 @@ import { resolveStep, type StepResult } from "../engine/cascade.ts";
 import type { MatchGroup } from "../engine/matches.ts";
 import type { Rng } from "../engine/rng.ts";
 import { applySwap, isValidSwap } from "../engine/swap.ts";
+import {
+  BEAM_DURATION_MS,
+  type BeamEffect,
+  updateBeams,
+} from "../render/effects.ts";
 import type {
   JuiceEvent,
   PuzzleSettings,
@@ -33,6 +39,7 @@ import {
   updateTweens,
 } from "./animations.ts";
 import { comboJuice } from "./juice.ts";
+import { computeClearDelays, computeFireDelays } from "./laserTiming.ts";
 
 export type Phase =
   | "IDLE"
@@ -51,6 +58,7 @@ export interface GameLoop {
   readonly board: Board;
   readonly phase: Phase;
   readonly sprites: ReadonlyMap<number, Sprite>;
+  readonly beams: readonly BeamEffect[];
   // Plain, non-reactive mirror of the store's settings (spec/02 §5): the
   // rAF loop reads this every frame instead of the Solid store proxy.
   // PuzzleGrid.tsx writes into it from a createEffect on settings changes.
@@ -123,6 +131,7 @@ export function createGameLoop(
   let phase: Phase = "IDLE";
   const sprites = buildInitialSprites(board);
   const tweens: Tween[] = [];
+  const beams: BeamEffect[] = [];
   const settingsSnapshot: PuzzleSettings = { ...initialSettings };
 
   let phaseTimer: number | null = null;
@@ -168,17 +177,32 @@ export function createGameLoop(
     }
   }
 
-  function queueClearTween(sprite: Sprite, gemId: number, t: Timings): void {
+  function queueClearTween(
+    sprite: Sprite,
+    gemId: number,
+    t: Timings,
+    delay: number,
+  ): void {
     const deleteSprite = () => sprites.delete(gemId);
     if (t.reducedMotion) {
       // Reduced motion has no scale pop (spec/04 §2.2) - the alpha fade is
       // the only visible animation, so deletion follows it directly.
       tweens.push(
-        tweenTo(sprite, "alpha", 0, t.clearAlpha, t.clearEase, deleteSprite),
+        tweenTo(
+          sprite,
+          "alpha",
+          0,
+          t.clearAlpha,
+          t.clearEase,
+          deleteSprite,
+          delay,
+        ),
       );
       return;
     }
-    tweens.push(tweenTo(sprite, "alpha", 0, t.clearAlpha, t.clearEase));
+    tweens.push(
+      tweenTo(sprite, "alpha", 0, t.clearAlpha, t.clearEase, undefined, delay),
+    );
     tweenSequence(
       tweens,
       sprite,
@@ -192,6 +216,7 @@ export function createGameLoop(
         { prop: "scale", to: 0, duration: t.clearScaleDown, ease: easeOutQuad },
       ],
       deleteSprite,
+      delay,
     );
   }
 
@@ -242,12 +267,61 @@ export function createGameLoop(
     });
   }
 
-  function startClearPhase(step: StepResult): void {
+  interface LaserEffects {
+    clearDelays: Map<number, number>;
+    maxEndTime: number;
+  }
+
+  // Laser beams stagger their swept gems' clears by distance x 18ms and
+  // chain-fired lasers hold their own beam until the sweep reaches them
+  // (spec/04 §2.5). Reduced motion drops the stagger entirely - presentation
+  // only, per the invariant that it never changes logical outcomes.
+  function startLaserEffects(
+    step: StepResult,
+    swap: SwapInfo | null,
+    t: Timings,
+  ): LaserEffects {
+    if (step.laserFires.length === 0) {
+      return { clearDelays: new Map(), maxEndTime: 0 };
+    }
+    const fireDelays = t.reducedMotion
+      ? step.laserFires.map(() => 0)
+      : computeFireDelays(step.laserFires, step.matchGroups, swap);
+    const beamDuration = t.reducedMotion ? t.clearAlpha : BEAM_DURATION_MS;
+    let maxEndTime = 0;
+
+    step.laserFires.forEach((fire, i) => {
+      const origin = step.clearedGems.find((c) =>
+        cellsEqual(c.cell, fire.cell),
+      );
+      beams.push({
+        cell: fire.cell,
+        orientation: fire.orientation,
+        kind: origin?.gem.kind ?? 0,
+        delay: fireDelays[i],
+        elapsed: 0,
+        duration: beamDuration,
+      });
+      maxEndTime = Math.max(maxEndTime, fireDelays[i] + beamDuration);
+    });
+
+    return {
+      clearDelays: computeClearDelays(step.laserFires, fireDelays),
+      maxEndTime,
+    };
+  }
+
+  function startClearPhase(step: StepResult, swap: SwapInfo | null): void {
     const t = timings();
-    for (const { gem } of step.clearedGems) {
+    const { clearDelays, maxEndTime } = startLaserEffects(step, swap, t);
+    let maxDuration = Math.max(t.clearAlpha, maxEndTime);
+
+    for (const { cell, gem } of step.clearedGems) {
       const sprite = sprites.get(gem.id);
       if (sprite) {
-        queueClearTween(sprite, gem.id, t);
+        const delay = clearDelays.get(idx(cell.row, cell.col)) ?? 0;
+        queueClearTween(sprite, gem.id, t, delay);
+        maxDuration = Math.max(maxDuration, delay + t.clearAlpha);
       }
     }
     // A special piece born on an existing (surviving) cell only changes that
@@ -261,7 +335,7 @@ export function createGameLoop(
     }
     pendingStep = step;
     resolvingSub = "clearing";
-    phaseTimer = t.clearAlpha;
+    phaseTimer = maxDuration;
     reportStep(step);
   }
 
@@ -350,7 +424,7 @@ export function createGameLoop(
     }
     combo += 1;
     board = step.board;
-    startClearPhase(step);
+    startClearPhase(step, swapArg);
   }
 
   function advancePhase(): void {
@@ -383,6 +457,7 @@ export function createGameLoop(
 
   function update(dt: number): void {
     updateTweens(tweens, dt);
+    updateBeams(beams, dt);
     if (phaseTimer === null) {
       return;
     }
@@ -402,6 +477,7 @@ export function createGameLoop(
       return phase;
     },
     sprites,
+    beams,
     settingsSnapshot,
     requestSwap(a, b) {
       if (phase !== "IDLE") {
