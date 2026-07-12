@@ -1,3 +1,4 @@
+import { batch } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
 import type { ThemeMode } from "../render/theme.ts";
 
@@ -68,4 +69,57 @@ export type PuzzleStore = [PuzzleState, SetStoreFunction<PuzzleState>];
 
 export function createPuzzleStore(): PuzzleStore {
   return createStore<PuzzleState>(createDefaultState());
+}
+
+const JUICE_QUEUE_LIMIT = 8;
+
+export interface StepResultInput {
+  scoreDelta: number;
+  combo: number;
+  gemsCleared: number;
+  lasersFired: number;
+  juice: JuiceEvent | null;
+}
+
+// Called at cascade step boundaries only (spec/02 §5): one batch per step,
+// never per frame.
+export function applyStepResult(
+  setStore: SetStoreFunction<PuzzleState>,
+  step: StepResultInput,
+): void {
+  batch(() => {
+    setStore("score", (score) => score + step.scoreDelta);
+    setStore("combo", step.combo);
+    setStore("stats", "totalScore", (total) => total + step.scoreDelta);
+    setStore("stats", "gemsCleared", (count) => count + step.gemsCleared);
+    setStore("stats", "bestCombo", (best) => Math.max(best, step.combo));
+    if (step.lasersFired > 0) {
+      setStore("stats", "lasersFired", (count) => count + step.lasersFired);
+    }
+    if (step.juice) {
+      const juice = step.juice;
+      setStore("juiceEvents", (events) => {
+        const trimmed =
+          events.length >= JUICE_QUEUE_LIMIT ? events.slice(1) : events;
+        return [...trimmed, juice];
+      });
+    }
+  });
+}
+
+export function resetCombo(setStore: SetStoreFunction<PuzzleState>): void {
+  setStore("combo", 0);
+}
+
+export function recordShuffle(setStore: SetStoreFunction<PuzzleState>): void {
+  setStore("stats", "gamesShuffled", (count) => count + 1);
+}
+
+export function expireJuiceEvent(
+  setStore: SetStoreFunction<PuzzleState>,
+  id: number,
+): void {
+  setStore("juiceEvents", (events) =>
+    events.filter((event) => event.id !== id),
+  );
 }

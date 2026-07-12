@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import { createEffect, onCleanup, onMount } from "solid-js";
 import {
   BOARD_SIZE,
@@ -6,18 +7,26 @@ import {
   createIdGenerator,
 } from "../engine/board.ts";
 import { mulberry32 } from "../engine/rng.ts";
+import { clampDt } from "../game/animations.ts";
 import { createGameLoop } from "../game/gameLoop.ts";
 import { type BoardRect, createInputController } from "../game/input.ts";
 import { type RenderOptions, renderBoard } from "../render/renderBoard.ts";
 import { getTheme } from "../render/theme.ts";
-import type { PuzzleSettings } from "../store/puzzleStore.ts";
+import {
+  applyStepResult,
+  type PuzzleStore,
+  recordShuffle,
+  resetCombo,
+} from "../store/puzzleStore.ts";
 import styles from "../styles/Puzzle.module.css";
 
 export interface PuzzleGridProps {
-  settings: PuzzleSettings;
+  store: PuzzleStore;
+  children?: JSX.Element;
 }
 
 function PuzzleGrid(props: PuzzleGridProps) {
+  const [state, setState] = props.store;
   let wrapperRef!: HTMLDivElement;
   let canvasRef!: HTMLCanvasElement;
 
@@ -34,7 +43,18 @@ function PuzzleGrid(props: PuzzleGridProps) {
       createBoard(rng, nextId),
       rng,
       nextId,
-      props.settings,
+      state.settings,
+      {
+        onStepResolved(info) {
+          applyStepResult(setState, info);
+        },
+        onCascadeEnd() {
+          resetCombo(setState);
+        },
+        onShuffle() {
+          recordShuffle(setState);
+        },
+      },
     );
 
     const renderOptions: RenderOptions = {
@@ -46,7 +66,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
     // Bridge from the reactive store to the non-reactive rAF loop (spec/02
     // §5): the hot loop reads this plain snapshot, never the store proxy.
     createEffect(() => {
-      Object.assign(loop.settingsSnapshot, props.settings);
+      Object.assign(loop.settingsSnapshot, state.settings);
       renderOptions.theme = getTheme(loop.settingsSnapshot.theme);
     });
 
@@ -127,11 +147,16 @@ function PuzzleGrid(props: PuzzleGridProps) {
     canvasRef.addEventListener("pointercancel", onPointerCancel);
 
     let rafId = 0;
-    function frame(): void {
+    let lastTime: number | null = null;
+    function frame(time: number): void {
+      const rawDt = lastTime === null ? 0 : time - lastTime;
+      lastTime = time;
+      loop.update(clampDt(rawDt));
+
       resizeCanvasIfDirty();
       renderOptions.cellSize = cellSize;
       renderOptions.selected = selectedCell;
-      renderBoard(ctx, loop.board, renderOptions);
+      renderBoard(ctx, loop.sprites, renderOptions);
       rafId = requestAnimationFrame(frame);
     }
     rafId = requestAnimationFrame(frame);
@@ -156,6 +181,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
         role="application"
         aria-label="Puzzle board"
       />
+      {props.children}
     </div>
   );
 }

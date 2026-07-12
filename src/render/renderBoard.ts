@@ -1,4 +1,5 @@
-import { BOARD_SIZE, type Board, type Cell, idx } from "../engine/board.ts";
+import { BOARD_SIZE, type Cell } from "../engine/board.ts";
+import type { Sprite } from "../game/animations.ts";
 import { gemShapePath, type Theme } from "./theme.ts";
 
 export interface RenderOptions {
@@ -8,10 +9,10 @@ export interface RenderOptions {
 }
 
 // Draw order per spec/04 §1.3 (shake/beam/particles land in later phases):
-// clear -> board background -> gems -> selection ring.
+// clear -> board background -> gem sprites -> selection ring.
 export function renderBoard(
   ctx: CanvasRenderingContext2D,
-  board: Board,
+  sprites: ReadonlyMap<number, Sprite>,
   options: RenderOptions,
 ): void {
   const { cellSize, theme, selected } = options;
@@ -19,7 +20,7 @@ export function renderBoard(
 
   ctx.clearRect(0, 0, boardPx, boardPx);
   drawBackground(ctx, theme, cellSize);
-  drawGems(ctx, board, theme, cellSize);
+  drawGems(ctx, sprites, theme, cellSize);
   if (selected) {
     drawSelectionRing(ctx, selected, theme, cellSize);
   }
@@ -41,24 +42,29 @@ function drawBackground(
 
 function drawGems(
   ctx: CanvasRenderingContext2D,
-  board: Board,
+  sprites: ReadonlyMap<number, Sprite>,
   theme: Theme,
   cellSize: number,
 ): void {
-  for (let row = 0; row < BOARD_SIZE; row++) {
-    for (let col = 0; col < BOARD_SIZE; col++) {
-      const gem = board[idx(row, col)];
-      if (!gem) {
-        continue;
-      }
-      const x = (col + 0.5) * cellSize;
-      const y = (row + 0.5) * cellSize;
-      ctx.translate(x, y);
-      ctx.fillStyle = theme.gemColors[gem.kind];
-      ctx.fill(gemShapePath(gem.kind, cellSize));
-      ctx.translate(-x, -y);
+  // Map#forEach avoids allocating a JS-visible iterator object every frame
+  // (unlike `for...of sprites.values()`), keeping this hot-path call free of
+  // per-frame allocations (spec/04 §4).
+  sprites.forEach((sprite) => {
+    if (sprite.alpha <= 0) {
+      return;
     }
-  }
+    const x = (sprite.x + 0.5) * cellSize;
+    const y = (sprite.y + 0.5) * cellSize;
+    ctx.save();
+    ctx.globalAlpha = sprite.alpha;
+    ctx.translate(x, y);
+    if (sprite.scale !== 1) {
+      ctx.scale(sprite.scale, sprite.scale);
+    }
+    ctx.fillStyle = theme.gemColors[sprite.kind];
+    ctx.fill(gemShapePath(sprite.kind, cellSize));
+    ctx.restore();
+  });
 }
 
 function drawSelectionRing(
