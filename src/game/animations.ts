@@ -158,7 +158,7 @@ export interface Timings {
   bounce: number;
 }
 
-const REDUCED_MOTION_MS = 80;
+export const REDUCED_MOTION_MS = 80;
 
 // spec/04 §2.2 table. Reduced motion collapses everything to a short linear
 // crossfade with no bounce, regardless of tier.

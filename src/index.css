@@ -9,6 +9,7 @@
   --text-muted: #6b6375;
   --border: #e5e4e7;
   --accent: #aa3bff;
+  --glass-bg: rgb(255 255 255 / 65%);
 
   color-scheme: light dark;
 }
@@ -21,6 +22,7 @@
     --text-muted: #9ca3af;
     --border: #2e303a;
     --accent: #c084fc;
+    --glass-bg: rgb(31 32 40 / 55%);
   }
 }
 
@@ -31,6 +33,7 @@
   --text-muted: #6b6375;
   --border: #e5e4e7;
   --accent: #aa3bff;
+  --glass-bg: rgb(255 255 255 / 65%);
 }
 
 :root[data-theme="dark"] {
@@ -40,6 +43,7 @@
   --text-muted: #9ca3af;
   --border: #2e303a;
   --accent: #c084fc;
+  --glass-bg: rgb(31 32 40 / 55%);
 }
 
 html,
@@ -50,6 +54,10 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  /* Theme toggle crossfade (spec/03 §7). */
+  transition:
+    background-color 300ms ease,
+    color 300ms ease;
 }
 
 #root {

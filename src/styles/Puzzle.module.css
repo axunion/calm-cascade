@@ -18,6 +18,124 @@
   }
 }
 
+/* Top flexible whitespace above the board (spec/03 §1): brand label only,
+   no interactive elements. */
+.topSpacer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Glassmorphism HUD + bottom trigger buttons (spec/03 §2, §4): sits below
+   the canvas, never overlapping it. */
+.hud {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(100%, 100dvh);
+  margin-inline: auto;
+  padding: 0.75rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
+}
+
+/* Shared glass surface (spec/03 §2): semi-transparent + blur, with a
+   near-opaque fallback for browsers without backdrop-filter. Composed by
+   .hudGlass / .iconButton here and by dialogs.module.css's .content. */
+.glassSurface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  transition:
+    background-color 300ms ease,
+    border-color 300ms ease;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glassSurface {
+    background: var(--bg-elevated);
+  }
+}
+
+.hudGlass {
+  composes: glassSurface;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+}
+
+.scoreBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.scoreLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.scoreValue {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.comboBadge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg-elevated);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.buttonRow {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.iconButton {
+  composes: glassSurface;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.iconButton:active {
+  transform: scale(0.96);
+  transition: transform 100ms ease;
+}
+
+@media (hover: hover) {
+  .iconButton:hover {
+    background: var(--bg-elevated);
+  }
+}
+
+@media (min-width: 768px) {
+  .hud {
+    max-width: min(560px, 80dvh);
+  }
+}
+
 /* Combo text overlay (spec/02 §5): sits exactly over the canvas, DOM text
    only - nothing is ever drawn on the canvas itself. */
 .juiceOverlay {
