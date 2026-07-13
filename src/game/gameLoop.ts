@@ -40,6 +40,8 @@ import {
 } from "./animations.ts";
 import { comboJuice } from "./juice.ts";
 import { computeClearDelays, computeFireDelays } from "./laserTiming.ts";
+import { createParticleSystem, type Particle } from "./particles.ts";
+import { createShakeSystem } from "./shake.ts";
 
 export type Phase =
   | "IDLE"
@@ -59,6 +61,8 @@ export interface GameLoop {
   readonly phase: Phase;
   readonly sprites: ReadonlyMap<number, Sprite>;
   readonly beams: readonly BeamEffect[];
+  readonly particles: readonly Particle[];
+  readonly shake: { x: number; y: number };
   // Plain, non-reactive mirror of the store's settings (spec/02 §5): the
   // rAF loop reads this every frame instead of the Solid store proxy.
   // PuzzleGrid.tsx writes into it from a createEffect on settings changes.
@@ -132,6 +136,8 @@ export function createGameLoop(
   const sprites = buildInitialSprites(board);
   const tweens: Tween[] = [];
   const beams: BeamEffect[] = [];
+  const particles = createParticleSystem(rng);
+  const shakeSystem = createShakeSystem(rng);
   const settingsSnapshot: PuzzleSettings = { ...initialSettings };
 
   let phaseTimer: number | null = null;
@@ -265,6 +271,10 @@ export function createGameLoop(
       lasersFired: step.laserFires.length,
       juice,
     });
+    // No reducedMotion guard here: updateShake() unconditionally zeroes
+    // trauma every frame while reducedMotion is on, so it's the sole
+    // gatekeeper and this stays correct either way.
+    shakeSystem.addTrauma(info.trauma);
   }
 
   interface LaserEffects {
@@ -316,12 +326,17 @@ export function createGameLoop(
     const { clearDelays, maxEndTime } = startLaserEffects(step, swap, t);
     let maxDuration = Math.max(t.clearAlpha, maxEndTime);
 
+    const spawnParticles =
+      settingsSnapshot.particles && !settingsSnapshot.reducedMotion;
     for (const { cell, gem } of step.clearedGems) {
       const sprite = sprites.get(gem.id);
       if (sprite) {
         const delay = clearDelays.get(idx(cell.row, cell.col)) ?? 0;
         queueClearTween(sprite, gem.id, t, delay);
         maxDuration = Math.max(maxDuration, delay + t.clearAlpha);
+      }
+      if (spawnParticles) {
+        particles.burst(cell.col, cell.row, gem.kind);
       }
     }
     // A special piece born on an existing (surviving) cell only changes that
@@ -458,6 +473,8 @@ export function createGameLoop(
   function update(dt: number): void {
     updateTweens(tweens, dt);
     updateBeams(beams, dt);
+    particles.update(dt);
+    shakeSystem.update(dt, settingsSnapshot.reducedMotion);
     if (phaseTimer === null) {
       return;
     }
@@ -478,6 +495,8 @@ export function createGameLoop(
     },
     sprites,
     beams,
+    particles: particles.particles,
+    shake: shakeSystem.shake,
     settingsSnapshot,
     requestSwap(a, b) {
       if (phase !== "IDLE") {

@@ -1,6 +1,7 @@
 import { BOARD_SIZE, type Cell } from "../engine/board.ts";
 import type { Sprite } from "../game/animations.ts";
-import { type BeamEffect, drawBeams } from "./effects.ts";
+import type { Particle } from "../game/particles.ts";
+import { type BeamEffect, drawBeams, drawParticles } from "./effects.ts";
 import { gemShapePath, laserArrowPath, type Theme } from "./theme.ts";
 
 export interface RenderOptions {
@@ -8,22 +9,30 @@ export interface RenderOptions {
   theme: Theme;
   selected: Cell | null;
   beams: readonly BeamEffect[];
+  particles: readonly Particle[];
+  shake: { x: number; y: number };
 }
 
-// Draw order per spec/04 §1.3 (shake/particles land in a later phase):
-// clear -> board background -> gem sprites -> laser beams -> selection ring.
+// Draw order per spec/04 §1.3: clear -> shake translate -> board background
+// -> gem sprites -> laser beams -> particles -> (restore) -> selection ring.
+// The shake translate never reaches the selection ring - it stays put like
+// the DOM HUD so it doesn't read as jittery.
 export function renderBoard(
   ctx: CanvasRenderingContext2D,
   sprites: ReadonlyMap<number, Sprite>,
   options: RenderOptions,
 ): void {
-  const { cellSize, theme, selected, beams } = options;
+  const { cellSize, theme, selected, beams, particles, shake } = options;
   const boardPx = cellSize * BOARD_SIZE;
 
   ctx.clearRect(0, 0, boardPx, boardPx);
+  ctx.save();
+  ctx.translate(shake.x, shake.y);
   drawBackground(ctx, theme, cellSize);
   drawGems(ctx, sprites, theme, cellSize);
   drawBeams(ctx, beams, theme, cellSize);
+  drawParticles(ctx, particles, theme, cellSize);
+  ctx.restore();
   if (selected) {
     drawSelectionRing(ctx, selected, theme, cellSize);
   }

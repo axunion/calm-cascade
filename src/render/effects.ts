@@ -1,6 +1,7 @@
 import type { Cell } from "../engine/board.ts";
 import { BOARD_SIZE } from "../engine/board.ts";
 import { easeOutQuad } from "../game/animations.ts";
+import type { Particle } from "../game/particles.ts";
 import type { Theme } from "./theme.ts";
 
 export const BEAM_DURATION_MS = 250;
@@ -93,6 +94,39 @@ function drawSweep(
   ctx.fillStyle = "#ffffff";
   fillBand(ctx, orientation, coreFrom, coreWidth, boardPx);
 
+  ctx.restore();
+}
+
+// Match-clear burst (spec/04 §2.3). Additive blending reads as a soft glow
+// without allocating a CanvasGradient per particle per frame.
+export function drawParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: readonly Particle[],
+  theme: Theme,
+  cellSize: number,
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of particles) {
+    if (!p.active) {
+      continue;
+    }
+    const alpha = p.life / p.maxLife;
+    if (alpha <= 0) {
+      continue;
+    }
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillStyle = theme.gemColors[p.kind];
+    ctx.beginPath();
+    ctx.arc(
+      (p.x + 0.5) * cellSize,
+      (p.y + 0.5) * cellSize,
+      p.size * cellSize,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
   ctx.restore();
 }
 

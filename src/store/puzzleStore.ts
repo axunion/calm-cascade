@@ -42,6 +42,16 @@ function prefersDarkTheme(): boolean {
   );
 }
 
+// spec/03 §6: reduced motion is OS setting OR the settings toggle. The OS
+// preference only seeds the initial toggle value (same pattern as the dark
+// theme default above) - from then on it's the user's explicit setting.
+function prefersReducedMotion(): boolean {
+  return (
+    typeof matchMedia === "function" &&
+    matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 function createDefaultState(): PuzzleState {
   return {
     score: 0,
@@ -55,7 +65,7 @@ function createDefaultState(): PuzzleState {
     },
     settings: {
       theme: prefersDarkTheme() ? "dark" : "light",
-      reducedMotion: false,
+      reducedMotion: prefersReducedMotion(),
       haptics: true,
       colorBlindShapes: false,
       sound: true,

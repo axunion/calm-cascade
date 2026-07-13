@@ -8,7 +8,9 @@ import {
 } from "../engine/board.ts";
 import { mulberry32 } from "../engine/rng.ts";
 import { clampDt } from "../game/animations.ts";
+import { createAudioEngine } from "../game/audio.ts";
 import { createGameLoop } from "../game/gameLoop.ts";
+import { vibrateMatch } from "../game/haptics.ts";
 import { type BoardRect, createInputController } from "../game/input.ts";
 import { type RenderOptions, renderBoard } from "../render/renderBoard.ts";
 import { getTheme } from "../render/theme.ts";
@@ -39,6 +41,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
 
     const rng = mulberry32(Date.now());
     const nextId = createIdGenerator();
+    const audio = createAudioEngine();
     const loop = createGameLoop(
       createBoard(rng, nextId),
       rng,
@@ -47,6 +50,13 @@ function PuzzleGrid(props: PuzzleGridProps) {
       {
         onStepResolved(info) {
           applyStepResult(setState, info);
+          if (info.gemsCleared > 0) {
+            audio.playMatch(info.combo);
+          }
+          if (info.lasersFired > 0) {
+            audio.playLaser();
+          }
+          vibrateMatch(loop.settingsSnapshot.haptics, Boolean(info.juice));
         },
         onCascadeEnd() {
           resetCombo(setState);
@@ -62,6 +72,8 @@ function PuzzleGrid(props: PuzzleGridProps) {
       theme: getTheme(loop.settingsSnapshot.theme),
       selected: null,
       beams: loop.beams,
+      particles: loop.particles,
+      shake: loop.shake,
     };
 
     // Bridge from the reactive store to the non-reactive rAF loop (spec/02
@@ -69,6 +81,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
     createEffect(() => {
       Object.assign(loop.settingsSnapshot, state.settings);
       renderOptions.theme = getTheme(loop.settingsSnapshot.theme);
+      audio.setEnabled(state.settings.sound);
     });
 
     let selectedCell: Cell | null = null;
@@ -129,6 +142,9 @@ function PuzzleGrid(props: PuzzleGridProps) {
     }
 
     function onPointerDown(event: PointerEvent): void {
+      // Lazy AudioContext init/resume must happen inside a user gesture
+      // (spec/04 §5) - the pointerdown that starts a swap gesture is it.
+      audio.unlock();
       canvasRef.setPointerCapture(event.pointerId);
       input.handlePointerDown(event, boardRect());
     }
