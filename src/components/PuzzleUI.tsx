@@ -67,6 +67,11 @@ function PuzzleUI(props: PuzzleUIProps) {
           <div class={styles.comboBadge}>Combo ×{state.combo}</div>
         </Show>
       </div>
+      {/* spec/03 §5: announce score at step boundaries only, so bind to the
+          real store value rather than the count-up display signal. */}
+      <span class="sr-only" aria-live="polite">
+        Score: {state.score}
+      </span>
       <div class={styles.buttonRow}>
         <InfoDialog stats={state.stats} />
         <SettingsDialog settings={state.settings} setStore={setState} />

@@ -67,3 +67,17 @@ body {
   display: grid;
   grid-template-rows: 1fr auto auto;
 }
+
+/* Visually hidden but announced by screen readers (spec/03 §5): a global
+   a11y utility, not scoped to any one component's CSS module. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
