@@ -40,7 +40,7 @@ calm-cascade は、癒しに全振りしたプレミアム 2D マッチ3 パズ�
 | ビルド | Vite 8 | `css.modules.localsConvention: "camelCaseOnly"` を設定に追加する |
 | UI フレームワーク | SolidJS 1.9 | 安定 API のみ使用（createStore / createSignal / createEffect / onMount / onCleanup / For / batch） |
 | 言語 | TypeScript 6（strict） | |
-| UI コンポーネント | @kobalte/core 0.13 | Dialog（設定・遊び方）、Tabs（統計） |
+| UI コンポーネント | @kobalte/core 0.13 | Dialog（設定・遊び方・デイリー）、Tabs（統計/Goals）、Switch、RadioGroup（テーマパック選択） |
 | アイコン | lucide-solid | |
 | スタイル | CSS Modules | ゲーム盤は Canvas 描画、テキスト演出は DOM オーバーレイ |
 | テスト | Vitest 4 | エンジン純関数を node 環境でカバー |
@@ -61,9 +61,18 @@ calm-cascade は、癒しに全振りしたプレミアム 2D マッチ3 パズ�
   3. 色覚多様性対応（宝石を色 + 形状で区別）
   4. Web Audio によるシンセ生成の効果音・環境音（設定でオフ可）
 
+### v2 スコープ（実装ロードマップ v2 — [05-implementation-plan.md](./05-implementation-plan.md)）
+
+1. **テーマパックシステム**: 背景・宝石を任意の画像に差し替え可能なバンドル型テーマ（`themes/` に置くだけで追加。[04-technical.md](./04-technical.md) §7）
+2. **特殊ピース拡張**: ボム（L/T 字）・プリズム（5 個直線）（[01-game-design.md](./01-game-design.md) §4）
+3. **実績「Garden Goals」+ テーマ解放**（01 §9）
+4. **デイリーチャレンジ「Today's Garden」**（01 §8）
+5. **盤面ギミック: 氷**（デイリー専用。01 §7）
+
 ### スコープ外（将来構想）
 
-- 5 個マッチ・L/T 字マッチ専用の追加特殊ピース（爆弾・全消し等）
+- 石ギミック（マッチ不能な障害物 — 氷が定着してから検討）
+- テーマパックのユーザーアップロード対応（実行時に任意画像を取り込む方式）
 - ステージ / レベル / ミッション制
 - オンラインランキング・ソーシャル要素
 - PWA 化（オフライン対応・ホーム画面追加）
@@ -76,6 +85,6 @@ calm-cascade は、癒しに全振りしたプレミアム 2D マッチ3 パズ�
 | [01-game-design.md](./01-game-design.md) | ゲームルール・スコア・レーザー仕様・演出ティア |
 | [02-architecture.md](./02-architecture.md) | モジュール構成・状態管理・データフロー |
 | [03-ui-ux.md](./03-ui-ux.md) | レイアウト・HUD・テーマ・アクセシビリティ |
-| [04-technical.md](./04-technical.md) | Canvas・アニメーション・入力・パフォーマンス・リスク |
+| [04-technical.md](./04-technical.md) | Canvas・アニメーション・入力・パフォーマンス・テーマパック・リスク |
 | [05-implementation-plan.md](./05-implementation-plan.md) | フェーズ分割の実装ロードマップ |
 | [06-testing.md](./06-testing.md) | Vitest テスト戦略 |

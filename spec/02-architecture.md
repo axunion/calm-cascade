@@ -16,12 +16,14 @@ src/
   App.tsx                       # 構成ルート: テーマ class 付与 + <PuzzleGrid/> + <JuiceOverlay/> + <PuzzleUI/>
   engine/                       # ★純関数のみ。DOM/Solid 依存禁止。全面テスト対象
     board.ts                    #   型定義、createBoard、idx ヘルパ、hasValidMove、reshuffle
-    rng.ts                      #   mulberry32（シード付き RNG）
+    rng.ts                      #   mulberry32 / seedFromString（シード付き RNG）
     matches.ts                  #   findMatches（直線 3+ 検出。L/T 字は 2 グループで返す）
-    specials.ts                 #   planSpecialSpawns（マッチ4 → レーザー生成ルール）
-    swap.ts                     #   isAdjacent / applySwap / isValidSwap
-    lasers.ts                   #   resolveLaserFires（BFS チェーン発火）
-    cascade.ts                  #   resolveStep / applyGravity / spawnGems / スコア計算
+    specials.ts                 #   planSpecialSpawns（prism / bomb / laser 生成ルール）
+    swap.ts                     #   isAdjacent / applySwap / isValidSwap（氷ガード含む）
+    fires.ts                    #   resolveSpecialFires（BFS チェーン発火。旧 lasers.ts の一般化）
+    cascade.ts                  #   resolveStep / applyGravity / spawnGems / 氷の減層
+    scoring.ts                  #   stepScore（スコア式の単一情報源）
+    ice.ts                      #   placeIce（デイリー盤面への氷配置）
   game/                         # 命令的・ブラウザ側・非リアクティブ
     gameLoop.ts                 #   フェーズ状態機械 + rAF オーケストレーション
     input.ts                    #   ポインタ入力状態機械（合成イベントで単体テスト可能な純度を保つ）
@@ -29,22 +31,33 @@ src/
     particles.ts                #   固定プールのパーティクルシステム
     juice.ts                    #   コンボ → JuiceEvent / ハプティクスパターン変換表
     audio.ts                    #   Web Audio シンセ（lazy 初期化・設定ゲート）
+    daily.ts                    #   todayKey / createDailyRun（Date 依存はここだけの薄い層）
+    achievements.ts             #   実績定義リスト + newlyUnlocked（stats → 判定の純関数）
   render/
-    renderBoard.ts              #   グリッド背景・宝石スプライト（色覚対応の形状バリアント）・選択リング
+    renderBoard.ts              #   グリッド背景・宝石スプライト（画像 / ベクタ分岐）・選択リング
     effects.ts                  #   ビーム・シェイク変換・リシャッフルフェード
-    theme.ts                    #   ダーク/ライトの宝石パレット + 形状定義（Canvas 色の単一情報源）
+    theme.ts                    #   組み込み（classic）の宝石パレット + 形状定義 + Theme 型
+    themePack.ts                #   ThemeManifest 型 + validateManifest（unknown → ThemeManifest | null）
+    themeRegistry.ts            #   import.meta.glob によるテーマパック発見・一覧・URL 解決
+    themeLoader.ts              #   resolveTheme（ImageBitmap ロード・フォールバック・キャッシュ）
+    scaledBitmaps.ts            #   cellSize×DPR 変化時のみ再構築する事前スケールキャッシュ
   store/
-    puzzleStore.ts              #   ★createStore: score/combo/stats/settings/juiceEvents + アクション
-    persistence.ts              #   localStorage ロード/セーブ（スキーマバージョン付き）
+    puzzleStore.ts              #   ★createStore: score/combo/stats/settings/mode/daily/実績 + アクション
+    persistence.ts              #   localStorage ロード/セーブ（スキーマ v2・1→2 マイグレーション）
   components/
     PuzzleGrid.tsx              #   ★canvas 要素・ループのライフサイクル・resize/DPR・ポインタバインド
     PuzzleUI.tsx                #   ★グラスモーフィズム HUD（スコア/コンボ）+ 下部トリガーボタン
     JuiceOverlay.tsx            #   DOM コンボテキストオーバーレイ
-    SettingsDialog.tsx          #   Kobalte Dialog: テーマ/モーション/ハプティクス/色覚/サウンド
-    InfoDialog.tsx              #   Kobalte Dialog + Tabs: 遊び方 / 統計
+    AchievementToast.tsx        #   実績解除のグラスチップトースト（直列キュー）
+    SettingsDialog.tsx          #   Kobalte Dialog: テーマパック選択 + 各トグル
+    InfoDialog.tsx              #   Kobalte Dialog + Tabs: 遊び方 / 統計 / Goals
   styles/
     Puzzle.module.css           #   ★盤面フレーム・HUD グラス・オーバーレイアニメ・juice ティア
-    dialogs.module.css          #   Kobalte dialog/tabs のグラススタイル
+    dialogs.module.css          #   Kobalte dialog/tabs/radio のグラススタイル
+
+themes/                         # リポジトリルート。バンドル型テーマパック置き場
+  <name>/manifest.json          #   置くだけで themeRegistry が自動発見（index ファイル不要）
+  <name>/*.png|webp             #   宝石 6 枚・背景（いずれも任意 — 色のみのパックも可）
 ```
 
 ★ = 元指示の必須 5 ファイル。名前はそのまま維持し、300 行規約を満たすためロジックを上記モジュールに分割する。
@@ -58,12 +71,13 @@ src/
 export const BOARD_SIZE = 8
 export const GEM_KINDS = 6                    // 0..5
 
-export type Special = 'none' | 'laserH' | 'laserV'
+export type Special = 'none' | 'laserH' | 'laserV' | 'bomb' | 'prism'
 
 export interface Gem {
   id: number          // セッション内で単調増加・一意。アニメーションの同期キー
   kind: number        // 0..5
   special: Special
+  ice: number         // 0 = なし、1〜2 = 氷の層数（special と併存させない）
 }
 
 export type Board = (Gem | null)[]            // フラット配列 64 要素。index = row * 8 + col
@@ -81,6 +95,10 @@ export interface Cell { row: number; col: number }
 宝石を生成するすべてのエンジン関数は `Rng`（`() => number`、[0,1)）を引数に取る。
 本番は `mulberry32(Date.now())`、テストは固定シード or スクリプト化したスタブを注入し、カスケードを決定的に再現する。
 
+デイリーチャレンジ用に `seedFromString(s: string): number`（FNV-1a 32bit）を `engine/rng.ts` に置く。
+`game/daily.ts` が `mulberry32(seedFromString("daily:" + dateKey))` で決定的な盤面と補充ストリームを作る
+（`Date` を読むのは `game/daily.ts` の `todayKey()` だけ — エンジンには入れない）。
+
 ### 主要エンジン API
 
 ```ts
@@ -92,27 +110,42 @@ findMatches(board: Board): MatchGroup[]
 
 // engine/swap.ts
 isValidSwap(board: Board, a: Cell, b: Cell): boolean
-// 隣接 かつ（スワップ後に findMatches が非空 または 両方レーザー）
+// 隣接 かつ 両方 ice なし かつ（スワップ後に findMatches が非空 または 両方特殊ピース）
+// 「両方特殊ピース」= special !== 'none' 同士のすべての組合せ（spec/01 §4.4）
 
-// engine/lasers.ts
-resolveLaserFires(board: Board, initialCleared: Set<number>): { cleared: Set<number>; fires: LaserFire[] }
-// BFS ワークリスト: マッチで消えるセル集合から開始し、含まれるレーザーを発火、
-// ビームが撃ったレーザーを追加発火。各レーザーは 1 回のみ → 必ず停止
+// engine/fires.ts（旧 lasers.ts の一般化）
+type SpecialKind = Exclude<Special, 'none'>
+interface SpecialFire { cell: Cell; special: SpecialKind }
+resolveSpecialFires(board: Board, initialCleared: Set<number>): { cleared: Set<number>; fires: SpecialFire[] }
+// BFS ワークリスト: マッチで消えるセル集合から開始し、含まれる特殊ピースを発火、
+// 効果範囲（laser = 行/列、bomb = 3x3、prism = 同 kind 全セル）に含まれる特殊を追加発火。
+// 各ピースは 1 回のみ → 必ず停止
+
+// engine/scoring.ts
+stepScore(clearedCount: number, combo: number): number    // = clearedCount * 10 * combo（式の単一情報源）
+
+// engine/ice.ts
+placeIce(board: Board, rng: Rng, count: number): Board
+// デイリー盤面生成用。special なし宝石から決定的に選び ice を付与、hasValidMove を満たすまで再試行
 
 // engine/cascade.ts
 interface StepResult {
   board: Board
   clearedGems: { cell: Cell; gem: Gem }[]
-  laserFires: LaserFire[]                                  // { cell, orientation }
+  fires: SpecialFire[]                                     // { cell, special }
   specialSpawns: SpecialSpawn[]                            // { cell, special, kind }
   falls: { gem: Gem; from: Cell; to: Cell }[]
   spawns: { gem: Gem; to: Cell; fromAboveRows: number }[]  // 降ってくるアニメ用のオフセット
   matchGroups: MatchGroup[]                                // juice テキストの位置決め用
+  iceBreaks: { cell: Cell; gem: Gem; remaining: number }[] // 消去の代わりに氷が 1 層減ったセル
 }
 resolveStep(board: Board, rng: Rng, swapTarget: Cell | null): StepResult | null
-// null = 盤面安定（マッチなし）。1 ステップ = 消去 + レーザー連鎖 + 特殊生成 + 重力 + スポーン。
+// null = 盤面安定（マッチなし）。1 ステップ = 消去 + 特殊連鎖 + 特殊生成 + 氷減層 + 重力 + スポーン。
 // エンジン自身はループしない — ゲームループがアニメーションを挟みながら繰り返し呼ぶ
 ```
+
+レーザーのビーム演出（掃引方向・スタッガー）は `orientation` を必要とするが、これは gameLoop 側で
+`SpecialFire`（laser 分のみ）から変換して `laserTiming` に渡す — `laserTiming` の API は変えない。
 
 ## 4. ゲーム状態機械（gameLoop.ts が所有、非リアクティブ）
 
@@ -145,15 +178,24 @@ resolveStep(board: Board, rng: Rng, swapTarget: Cell | null): StepResult | null
 
 ```ts
 // store/puzzleStore.ts
+type GameMode = 'endless' | 'daily'
+interface DailyRecord { date: string; bestScore: number }   // 当日分のみ保持
+
 interface PuzzleState {
   score: number
   combo: number                       // 表示用コピー（真値はループ側）
+  mode: GameMode                      // 切替は PuzzleGrid の再マウントで反映（§8）
+  daily: DailyRecord | null
   stats: {
     totalScore: number; bestCombo: number; gemsCleared: number
-    lasersFired: number; gamesShuffled: number
+    lasersFired: number; bombsDetonated: number; prismsFired: number
+    iceBroken: number; dailiesPlayed: number; gamesShuffled: number
   }
+  unlockedAchievements: string[]      // 実績 id。解除は不可逆・永続化
+  achievementToasts: { id: string; title: string }[]  // 表示待ちキュー（直列・セッション限り）
   settings: {
     theme: 'dark' | 'light'
+    skin: string                      // テーマパック id。デフォルト "classic"（組み込みベクタ）
     reducedMotion: boolean            // OS 設定との OR で最終判定
     haptics: boolean
     colorBlindShapes: boolean
@@ -163,6 +205,9 @@ interface PuzzleState {
   juiceEvents: JuiceEvent[]
 }
 ```
+
+実績評価は `applyStepResult` / `recordShuffle` / デイリーベスト更新の `batch()` 末尾で
+`game/achievements.ts` の `newlyUnlocked(stats, already)` を呼ぶ（stats が変化する箇所 = ステップ境界のみ）。
 
 ### 2 つの世界の橋渡し
 
@@ -205,7 +250,34 @@ frame(t):
 
 ## 7. 永続化（store/persistence.ts）
 
-- キー: `localStorage["calm-cascade/v1"]`。スキーマバージョンを持ち、不一致・破損時はデフォルトへフォールバック（try/catch 必須 — プライベートブラウジングで throw する環境がある）
-- 対象: `settings` と `stats`。`score` / `combo` はセッション限り
+- キー: `localStorage["calm-cascade/v1"]`（キー名は据え置き — 単なる名前）。`SCHEMA_VERSION = 2`
+- 対象: `settings` / `stats` / `unlockedAchievements` / `daily`。`score` / `combo` / `mode` / トーストはセッション限り
+- **マイグレーション**: `version === 1` のペイロードは欠落フィールドをデフォルト補完して受理する
+  （`settings.skin = "classic"`、新 stats 4 種 = 0、`unlockedAchievements = []`、`daily = null`）。
+  既存ユーザーの設定・統計を絶対に消さない。マイグレーションは 1→2 の 1 段のみ。詳細スキーマは [04-technical.md](./04-technical.md) §7.5
+- 破損・不明バージョンはデフォルトへフォールバック（try/catch 必須 — プライベートブラウジングで throw する環境がある）
 - 保存: `createEffect` で serialize、**500ms debounce**
 - 読み込み: store 生成時に 1 回
+
+## 8. テーマパックの解決フローとモード切替
+
+### テーマ解決（非同期 → plain オブジェクト）
+
+原則: **テーマ解決は非同期、rAF ホットループは解決済みの plain な `Theme` オブジェクトだけを読む**。
+
+1. `render/themeRegistry.ts` がモジュール初期化時に `import.meta.glob` で全 manifest を同期収集し、
+   `validateManifest` を通らないパックは console.warn して一覧から除外（設定 UI に出ない = 選べない）
+2. `PuzzleGrid.tsx` の createEffect（**skin と theme だけを読む専用 effect** — 他のトグル変更で再ロードさせない）が
+   `resolveTheme(skin, mode)` を呼ぶ。完了までは組み込み `getTheme(mode)` を即時セットしておき、
+   解決したら `renderOptions.theme` をフィールド書き換えで差し替える（世代トークンでレース防御）
+3. `render/themeLoader.ts` は画像を `fetch → createImageBitmap` で並列ロード。
+   **失敗は資産単位で null**（その宝石だけベクタ描画 / 背景だけ市松にフォールバック）。
+   manifest 不明・skin 不明は組み込み classic に全体縮退。結果は `Map<skinId/mode, Theme>` にキャッシュ
+4. 描画は `render/scaledBitmaps.ts` の事前スケールキャッシュを参照（[04-technical.md](./04-technical.md) §7.4）
+
+### モード切替（endless ⇄ daily）
+
+- `App.tsx` が `state.mode` を keyed な `<Show>` / `<Switch>` で分岐し、**PuzzleGrid を再マウント**する
+- PuzzleGrid は props で `board / rng / nextId` を注入可能にする（endless = `mulberry32(Date.now())` の従来生成、
+  daily = `game/daily.ts` の `createDailyRun(todayKey())`）
+- ゲームループ・スプライト・入力状態はマウント時に全部作り直す（途中状態の移送はしない — 最も単純で確実）

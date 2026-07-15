@@ -20,12 +20,23 @@
 ### 1.3 描画順（render/renderBoard.ts + effects.ts）
 
 ```
-clear → シェイク translate → 盤面背景（セルのうっすらした市松） → 宝石スプライト
-     → レーザービーム → パーティクル → 選択パルスリング
+clear → シェイク translate → 盤面背景（背景画像 or セルのうっすらした市松） → 宝石スプライト
+     → ビーム → パーティクル → 選択パルスリング
 ```
 
-- 宝石は `render/theme.ts` の形状定義（Path2D）+ パレットで描画。形状はセルサイズに対する比率で定義（リサイズ耐性）
+- 宝石はテーマパックの解決結果で分岐する:
+  - **画像あり**（`theme.gems[kind] !== null`）→ `render/scaledBitmaps.ts` の事前スケール済み canvas を `drawImage`
+  - **画像なし** → 従来どおり `render/theme.ts` の形状定義（Path2D）+ `theme.gemColors[kind]` で fill
+  - 既存の translate / scale / alpha（トゥイーン）は両経路で共通に効く
+- 背景も同様: `theme.background` があれば盤面全体に 1 回の `drawImage`、なければ市松の fillRect ループ。
+  シェイク translate の内側なので画像も一緒に揺れる（現仕様どおり）
+- 特殊ピースのアイコン（矢印・ボム・プリズム）は画像の上にも常時ベクタ描画（色非依存キュー — [03-ui-ux.md](./03-ui-ux.md) §6）
+- 形状・アイコンはセルサイズに対する比率で定義（リサイズ耐性）
 - テキストは Canvas に一切描かない（DOM オーバーレイの責務）
+
+**shapeCache の罠**: `gemShapePath(kind, cellSize)` のキャッシュは「直近の cellSize 1 値」で無効化される。
+同一フレームで複数の cellSize を渡すと毎フレーム全再構築になる — 縮小描画（色覚ミニグリフ等）は
+必ず `ctx.scale` で行い、`gemShapePath` は常に単一の cellSize でのみ呼ぶこと。
 
 ## 2. アニメーションシステム（game/animations.ts）
 
@@ -127,7 +138,7 @@ const col = Math.floor((e.clientX - r.left) / (r.width / 8))
   - フレーム内アロケーションゼロ（トゥイーン swap-remove・パーティクル固定プール・一時オブジェクト再利用）
   - 描画は毎フレーム全消去 + 全描画のシンプル構成（8x8 + パーティクルは十分軽い。ダーティ矩形などの複雑化はしない）
   - `backdrop-filter` を canvas に重ねない
-  - 検証方法は [05-implementation-plan.md](./05-implementation-plan.md) フェーズ 7 参照（Chrome DevTools の CPU 4x throttle + Performance パネル）
+  - 検証方法は [05-implementation-plan.md](./05-implementation-plan.md) の各フェーズの検証ゲート参照（Canvas 描画に触れるフェーズ 6・14 で Chrome DevTools の CPU 4x throttle + Performance パネル）
 
 ## 5. サウンド（game/audio.ts）
 
@@ -147,7 +158,92 @@ const col = Math.floor((e.clientX - r.left) / (r.width / 8))
 - パターン: マッチ 10ms、コンボティア上昇 20ms
 - iOS Safari は非対応（`navigator.vibrate` が undefined）— 自然に no-op になる
 
-## 7. 既知リスクと対策（実装時チェックリスト）
+## 7. テーマパック技術仕様
+
+### 7.1 配置と発見
+
+- テーマパックはリポジトリルート `themes/<name>/` に置く。`<name>`（ディレクトリ名）がそのままパック id
+  （manifest に id は持たせない — 重複・不一致の余地を消す）
+- 発見は `render/themeRegistry.ts` の `import.meta.glob`（root 絶対パターン）:
+  - `"/themes/*/manifest.json"` — eager import（微小 JSON なので同期バンドル）
+  - `"/themes/*/*.{png,webp,jpg,jpeg}"` — `query: "?url"`（URL 文字列のみバンドル。実データは選択時に初めてダウンロード）
+- `public/` 配下は glob 対象にできないため使わない。root 絶対 glob は dev / build / vitest（node）すべてで機能する
+- ディレクトリを置くだけで一覧に出る。index ファイルの手動保守はしない
+
+### 7.2 manifest スキーマ（`themes/<name>/manifest.json`）
+
+TypeScript 型（`render/themePack.ts`）が正:
+
+```ts
+interface ThemePackColors {
+  gemColors: string[]       // 必須・長さ 6。パーティクル色・ビーム色・ベクタ fallback 塗り色を兼ねる
+  boardTileA: string        // 背景画像なし時の市松 A / 画像失敗時 fallback
+  boardTileB: string
+  selectionRing: string
+  uiAccent?: string         // CSS 変数 --accent の上書き。省略時は CSS デフォルト
+}
+
+interface ThemeManifest {
+  manifestVersion: 1
+  displayName: string                   // 設定 UI の表示名
+  gems: (string | null)[]               // 長さ 6。同ディレクトリ相対のファイル名。null = ベクタ形状で描画
+  background: string | null             // 盤面全体の背景画像。null = 市松
+  colors: ThemePackColors
+  colorsLight?: Partial<ThemePackColors> // light モード時の部分上書き。省略時は colors をそのまま使用
+}
+```
+
+- **ハイブリッド許可**: `gems` の一部だけ画像・残り null（ベクタ）は正式仕様（フォールバック経路と同一コードパス）
+- バリデーション: `validateManifest(value: unknown): ThemeManifest | null` — 手書きチェックのパース関数
+  （zod 等の依存追加はしない）。不正は null を返し、`background: undefined` は null に正規化する。
+  不正な manifest は console.warn して一覧から除外（設定 UI に出ない = 選べない）。色値の hex 形式までは検証しない
+- **レーザー矢印等の特殊ピースアイコンは manifest で定義できない**（意図的 — a11y キューをテーマ作者が壊せない）
+- 推奨画像: 256×256 の webp / png（透過）。詳細はテーマ作者向け `themes/README.md` に記載
+
+### 7.3 ロードとフォールバック（render/themeLoader.ts）
+
+```ts
+type BitmapLoader = (url: string) => Promise<ImageBitmap | null>   // テスト時の注入点
+resolveTheme(skinId: string, mode: ThemeMode, loader?: BitmapLoader): Promise<Theme>
+```
+
+- 実装: `fetch → blob → createImageBitmap`。**あらゆる失敗は null**（throw しない・ユーザー通知しない・console.warn のみ）
+- フォールバックは**資産単位**: 宝石 1 枚の失敗 → その宝石だけベクタ。背景の失敗 → 市松。
+  manifest 不明 / skin 不明 → 組み込み `getTheme(mode)` に全体縮退
+- `settings.skin` の値は失敗しても巻き戻さない — パックが後で直れば次回ロードで復活する（最も単純）
+- 結果は `Map<"skinId/mode", Theme>` にキャッシュ（dark/light トグルやスキン往復で再デコードしない）
+- mode = light のとき `colors` に `colorsLight` をスプレッドマージしてから解決する
+
+### 7.4 事前スケールキャッシュ（render/scaledBitmaps.ts）
+
+ImageBitmap を毎フレーム縮小 drawImage しない（ミッドレンジモバイルの縮小コスト・DPR ぼやけ対策）。
+
+- `(theme 参照, round(cellSize × dpr))` が変わった時だけオフスクリーン canvas に再スケール —
+  既存 shapeCache と同一の無効化パターン。**フレーム内は lookup + drawImage のみ**（§4 アロケーション規約に準拠）
+- 宝石: `cellPx = round(cellSize × 0.9 × dpr)` の正方 canvas。背景: 盤面実ピクセルサイズの canvas
+- 描画側は CSS px 座標のまま `drawImage(canvas, dx, dy, cssSize, cssSize)` — ctx の DPR transform で
+  1:1 デバイスピクセルになり、クリスプかつ縮小コストゼロ
+- `RenderOptions` に `dpr` フィールドを追加し、PuzzleGrid のリサイズ処理が書き込む
+
+### 7.5 永続化スキーマ v2（store/persistence.ts）
+
+```ts
+const SCHEMA_VERSION = 2   // STORAGE_KEY "calm-cascade/v1" は据え置き（キー名は単なる名前）
+
+interface PersistedPayload {
+  version: 2
+  settings: PuzzleSettings          // skin を含む
+  stats: PuzzleStats                // bombsDetonated / prismsFired / iceBroken / dailiesPlayed を含む
+  unlockedAchievements: string[]
+  daily: DailyRecord | null         // { date: "YYYY-MM-DD", bestScore: number }
+}
+```
+
+- **1→2 マイグレーション**: `version === 1` は欠落フィールドをデフォルト補完して受理
+  （`skin: "classic"`、新 stats = 0、`unlockedAchievements: []`、`daily: null`）。既存の設定・統計は消さない
+- 存在しない skin id（パックが削除された等）は永続化層では関知しない — `resolveTheme` が classic に縮退する
+
+## 8. 既知リスクと対策（実装時チェックリスト）
 
 | # | リスク | 対策 |
 |---|---|---|
@@ -162,3 +258,6 @@ const col = Math.floor((e.clientX - r.left) / (r.width / 8))
 | 9 | `backdrop-filter` × 再描画 canvas の合成コスト | HUD は canvas の下に並べる + `@supports` フォールバック |
 | 10 | AudioContext が autoplay 制約で始動しない | 初回ジェスチャで lazy 初期化 + resume |
 | 11 | localStorage がプライベートブラウジングで throw | 全アクセスを try/catch + メモリフォールバック |
+| 12 | テーマ画像のロード/デコード失敗で盤面が壊れる | 資産単位フォールバック（§7.3）— 失敗した宝石だけベクタ、manifest 不正は classic 縮退 |
+| 13 | 画像の毎フレーム縮小 drawImage / 複数 cellSize の gemShapePath 呼び出しでフレーム予算超過 | 事前スケールキャッシュ（§7.4）+ 縮小は ctx.scale で行う（§1.3 の罠） |
+| 14 | スキーマ v2 バンプで既存ユーザーの stats が消える | version === 1 をデフォルト補完で受理する 1→2 マイグレーション（§7.5）。reject しない |
