@@ -2,6 +2,7 @@ import { createEffect } from "solid-js";
 import JuiceOverlay from "./components/JuiceOverlay.tsx";
 import PuzzleGrid from "./components/PuzzleGrid.tsx";
 import PuzzleUI from "./components/PuzzleUI.tsx";
+import { getUiAccent } from "./render/themeRegistry.ts";
 import {
   createDebouncedSave,
   loadPersistedState,
@@ -35,6 +36,17 @@ function App() {
 
   createEffect(() => {
     document.documentElement.dataset.theme = state.settings.theme;
+  });
+
+  // spec/03 §5: uiAccent overrides --accent inline; classic/undefined falls
+  // back to the CSS default for the current dark/light mode.
+  createEffect(() => {
+    const accent = getUiAccent(state.settings.skin, state.settings.theme);
+    if (accent) {
+      document.documentElement.style.setProperty("--accent", accent);
+    } else {
+      document.documentElement.style.removeProperty("--accent");
+    }
   });
 
   return (

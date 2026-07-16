@@ -1,10 +1,20 @@
 import { Dialog } from "@kobalte/core/dialog";
+import { RadioGroup } from "@kobalte/core/radio-group";
 import { Switch } from "@kobalte/core/switch";
 import { Settings, X } from "lucide-solid";
+import { For } from "solid-js";
 import type { SetStoreFunction } from "solid-js/store";
+import { getManifest, listSkins } from "../render/themeRegistry.ts";
 import type { PuzzleSettings, PuzzleState } from "../store/puzzleStore.ts";
 import dialogStyles from "../styles/dialogs.module.css";
 import puzzleStyles from "../styles/Puzzle.module.css";
+
+function skinDisplayName(skinId: string): string {
+  if (skinId === "classic") {
+    return "Classic";
+  }
+  return getManifest(skinId)?.displayName ?? skinId;
+}
 
 export interface SettingsDialogProps {
   settings: PuzzleSettings;
@@ -56,6 +66,30 @@ function SettingsDialog(props: SettingsDialogProps) {
                 <X size={20} aria-hidden="true" />
               </Dialog.CloseButton>
             </div>
+            <RadioGroup
+              class={dialogStyles.themeRadioGroup}
+              value={props.settings.skin}
+              onChange={(value) => props.setStore("settings", "skin", value)}
+            >
+              <RadioGroup.Label class={dialogStyles.sectionLabel}>
+                Theme pack
+              </RadioGroup.Label>
+              <For each={listSkins()}>
+                {(skinId) => (
+                  <RadioGroup.Item value={skinId} class={dialogStyles.radioRow}>
+                    <RadioGroup.ItemInput />
+                    <RadioGroup.ItemControl class={dialogStyles.radioControl}>
+                      <RadioGroup.ItemIndicator
+                        class={dialogStyles.radioIndicator}
+                      />
+                    </RadioGroup.ItemControl>
+                    <RadioGroup.ItemLabel class={dialogStyles.radioLabel}>
+                      {skinDisplayName(skinId)}
+                    </RadioGroup.ItemLabel>
+                  </RadioGroup.Item>
+                )}
+              </For>
+            </RadioGroup>
             <div class={dialogStyles.toggleList}>
               <SwitchRow
                 label="Dark theme"
