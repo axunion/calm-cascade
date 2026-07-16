@@ -50,7 +50,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
       state.settings,
       {
         onStepResolved(info) {
-          applyStepResult(setState, info);
+          const unlocked = applyStepResult(props.store, info);
           if (info.gemsCleared > 0) {
             audio.playMatch(info.combo);
           }
@@ -60,13 +60,18 @@ function PuzzleGrid(props: PuzzleGridProps) {
           if (info.prismsFired > 0) {
             audio.playPrism();
           }
+          if (unlocked) {
+            audio.playAchievement();
+          }
           vibrateMatch(loop.settingsSnapshot.haptics, Boolean(info.juice));
         },
         onCascadeEnd() {
           resetCombo(setState);
         },
         onShuffle() {
-          recordShuffle(setState);
+          if (recordShuffle(props.store)) {
+            audio.playAchievement();
+          }
         },
       },
     );

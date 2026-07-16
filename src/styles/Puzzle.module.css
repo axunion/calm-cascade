@@ -185,10 +185,16 @@
   }
 }
 
+/* spec/03 §6: reduced motion is the OS query OR the in-app toggle (mirrored
+   onto :root[data-reduced-motion] by App.tsx) - either one applies this. */
 @media (prefers-reduced-motion: reduce) {
   .juiceText {
     animation: juiceFade 0.3s ease-out forwards;
   }
+}
+
+:global(:root[data-reduced-motion="true"]) .juiceText {
+  animation: juiceFade 0.3s ease-out forwards;
 }
 
 @keyframes juiceFade {
@@ -196,6 +202,69 @@
     opacity: 1;
   }
   to {
+    opacity: 0;
+  }
+}
+
+/* Achievement toast (spec/03 §8): a single small glass chip at the board's
+   top edge, pointer-events none so it never blocks input. Timing is
+   fade-in 300ms -> hold 3.5s -> fade-out 300ms (4100ms total). */
+.achievementToast {
+  composes: glassSurface;
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: achievementToastPlay 4100ms ease-in-out forwards;
+}
+
+@keyframes achievementToastPlay {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  7.3% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  92.7% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .achievementToast {
+    animation: achievementToastPlayReduced 3660ms ease-in-out forwards;
+  }
+}
+
+:global(:root[data-reduced-motion="true"]) .achievementToast {
+  animation: achievementToastPlayReduced 3660ms ease-in-out forwards;
+}
+
+@keyframes achievementToastPlayReduced {
+  0% {
+    opacity: 0;
+  }
+  2.2% {
+    opacity: 1;
+  }
+  97.8% {
+    opacity: 1;
+  }
+  100% {
     opacity: 0;
   }
 }

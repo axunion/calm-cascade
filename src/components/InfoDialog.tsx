@@ -2,6 +2,7 @@ import { Dialog } from "@kobalte/core/dialog";
 import { Tabs } from "@kobalte/core/tabs";
 import {
   ArrowLeftRight,
+  Check,
   Flower2,
   Gem,
   Info,
@@ -9,13 +10,15 @@ import {
   X,
   Zap,
 } from "lucide-solid";
-import type { JSX } from "solid-js";
+import { type JSX, Show } from "solid-js";
+import { ACHIEVEMENTS } from "../game/achievements.ts";
 import type { PuzzleStats } from "../store/puzzleStore.ts";
 import dialogStyles from "../styles/dialogs.module.css";
 import puzzleStyles from "../styles/Puzzle.module.css";
 
 export interface InfoDialogProps {
   stats: PuzzleStats;
+  unlockedAchievements: string[];
 }
 
 interface HowToStep {
@@ -54,8 +57,10 @@ const STAT_ROWS: { label: string; key: keyof PuzzleStats }[] = [
   { label: "Times shuffled", key: "gamesShuffled" },
 ];
 
-// Kobalte Dialog + Tabs (spec/03 §3): "How to Play" (brief 3-step
-// explanation) and "Stats" (the 5 PuzzleStats fields).
+// Kobalte Dialog + Tabs (spec/03 §3): "How to Play" (brief step-by-step
+// explanation), "Stats" (the 5 PuzzleStats fields), and "Goals" (all
+// achievements - spec/01 §9 forbids hidden achievements, so unlocked and
+// locked ones both always show their condition).
 function InfoDialog(props: InfoDialogProps) {
   return (
     <Dialog>
@@ -89,6 +94,9 @@ function InfoDialog(props: InfoDialogProps) {
                 <Tabs.Trigger class={dialogStyles.tabTrigger} value="stats">
                   Stats
                 </Tabs.Trigger>
+                <Tabs.Trigger class={dialogStyles.tabTrigger} value="goals">
+                  Goals
+                </Tabs.Trigger>
                 <Tabs.Indicator class={dialogStyles.tabIndicator} />
               </Tabs.List>
               <Tabs.Content class={dialogStyles.tabContent} value="how-to-play">
@@ -110,6 +118,39 @@ function InfoDialog(props: InfoDialogProps) {
                     </div>
                   ))}
                 </dl>
+              </Tabs.Content>
+              <Tabs.Content class={dialogStyles.tabContent} value="goals">
+                <ul class={dialogStyles.goalsList}>
+                  {ACHIEVEMENTS.map((achievement) => (
+                    <li class={dialogStyles.goalRow}>
+                      <Show
+                        when={props.unlockedAchievements.includes(
+                          achievement.id,
+                        )}
+                        fallback={
+                          <span
+                            class={dialogStyles.goalIconSlot}
+                            aria-hidden="true"
+                          />
+                        }
+                      >
+                        <Check
+                          size={18}
+                          aria-hidden="true"
+                          class={dialogStyles.goalCheck}
+                        />
+                      </Show>
+                      <div class={dialogStyles.goalText}>
+                        <span class={dialogStyles.goalTitle}>
+                          {achievement.title}
+                        </span>
+                        <span class={dialogStyles.goalDescription}>
+                          {achievement.description}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </Tabs.Content>
             </Tabs>
           </Dialog.Content>

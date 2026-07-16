@@ -9,6 +9,13 @@ const STOP_TAIL_SECONDS = 0.05;
 // (spec/01 §4.3), distinct from the laser's descending sweep.
 const PRISM_CHIME_HZ = [880, 1318.51];
 const PRISM_CHIME_RELEASE_SECONDS = 0.4;
+// E5 -> A5, a gentle two-note rise for an achievement unlock (spec/03 §8:
+// "音は既存のやわらかいシンセ2音") - same soft-synth voice as the rest of
+// this module, staggered instead of simultaneous so it doesn't read as a
+// second prism chime.
+const ACHIEVEMENT_CHIME_HZ = [659.25, 880];
+const ACHIEVEMENT_NOTE_GAP_SECONDS = 0.12;
+const ACHIEVEMENT_RELEASE_SECONDS = 0.35;
 
 export interface AudioEngine {
   unlock(): void;
@@ -16,6 +23,7 @@ export interface AudioEngine {
   playMatch(comboStep: number): void;
   playLaser(): void;
   playPrism(): void;
+  playAchievement(): void;
 }
 
 export function createAudioEngine(): AudioEngine {
@@ -112,6 +120,30 @@ export function createAudioEngine(): AudioEngine {
       for (const freq of PRISM_CHIME_HZ) {
         playTone(freq, PRISM_CHIME_RELEASE_SECONDS);
       }
+    },
+    playAchievement() {
+      const context = ensureContext();
+      const masterGain = master;
+      if (!context || !masterGain) {
+        return;
+      }
+      const attack = 0.005;
+      ACHIEVEMENT_CHIME_HZ.forEach((freq, i) => {
+        const now = context.currentTime + i * ACHIEVEMENT_NOTE_GAP_SECONDS;
+        const { osc, gain } = createVoice(
+          context,
+          masterGain,
+          now,
+          attack + ACHIEVEMENT_RELEASE_SECONDS,
+        );
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.28, now + attack);
+        gain.gain.exponentialRampToValueAtTime(
+          0.0001,
+          now + attack + ACHIEVEMENT_RELEASE_SECONDS,
+        );
+      });
     },
   };
 }

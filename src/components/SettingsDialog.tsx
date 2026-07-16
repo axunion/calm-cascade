@@ -1,9 +1,10 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { RadioGroup } from "@kobalte/core/radio-group";
 import { Switch } from "@kobalte/core/switch";
-import { Settings, X } from "lucide-solid";
-import { For } from "solid-js";
+import { Lock, Settings, X } from "lucide-solid";
+import { For, Show } from "solid-js";
 import type { SetStoreFunction } from "solid-js/store";
+import { ACHIEVEMENTS } from "../game/achievements.ts";
 import { getManifest, listSkins } from "../render/themeRegistry.ts";
 import type { PuzzleSettings, PuzzleState } from "../store/puzzleStore.ts";
 import dialogStyles from "../styles/dialogs.module.css";
@@ -16,9 +17,18 @@ function skinDisplayName(skinId: string): string {
   return getManifest(skinId)?.displayName ?? skinId;
 }
 
+// spec/01 §9: a pack stays locked (selection UI only - resolveTheme itself
+// doesn't care) until the achievement naming it in unlocksTheme is unlocked.
+function themeUnlockAchievement(skinId: string) {
+  return ACHIEVEMENTS.find(
+    (achievement) => achievement.unlocksTheme === skinId,
+  );
+}
+
 export interface SettingsDialogProps {
   settings: PuzzleSettings;
   setStore: SetStoreFunction<PuzzleState>;
+  unlockedAchievements: string[];
 }
 
 interface SwitchRowProps {
@@ -75,19 +85,35 @@ function SettingsDialog(props: SettingsDialogProps) {
                 Theme pack
               </RadioGroup.Label>
               <For each={listSkins()}>
-                {(skinId) => (
-                  <RadioGroup.Item value={skinId} class={dialogStyles.radioRow}>
-                    <RadioGroup.ItemInput />
-                    <RadioGroup.ItemControl class={dialogStyles.radioControl}>
-                      <RadioGroup.ItemIndicator
-                        class={dialogStyles.radioIndicator}
-                      />
-                    </RadioGroup.ItemControl>
-                    <RadioGroup.ItemLabel class={dialogStyles.radioLabel}>
-                      {skinDisplayName(skinId)}
-                    </RadioGroup.ItemLabel>
-                  </RadioGroup.Item>
-                )}
+                {(skinId) => {
+                  const requirement = themeUnlockAchievement(skinId);
+                  const locked = requirement
+                    ? !props.unlockedAchievements.includes(requirement.id)
+                    : false;
+                  return (
+                    <RadioGroup.Item
+                      value={skinId}
+                      class={dialogStyles.radioRow}
+                      disabled={locked}
+                    >
+                      <RadioGroup.ItemInput />
+                      <RadioGroup.ItemControl class={dialogStyles.radioControl}>
+                        <RadioGroup.ItemIndicator
+                          class={dialogStyles.radioIndicator}
+                        />
+                      </RadioGroup.ItemControl>
+                      <RadioGroup.ItemLabel class={dialogStyles.radioLabel}>
+                        {skinDisplayName(skinId)}
+                        <Show when={locked}>
+                          <span class={dialogStyles.radioLockHint}>
+                            <Lock size={12} aria-hidden="true" />
+                            Unlock: {requirement?.title}
+                          </span>
+                        </Show>
+                      </RadioGroup.ItemLabel>
+                    </RadioGroup.Item>
+                  );
+                }}
               </For>
             </RadioGroup>
             <div class={dialogStyles.toggleList}>

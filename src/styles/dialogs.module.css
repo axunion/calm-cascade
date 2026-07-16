@@ -90,6 +90,8 @@
   }
 }
 
+/* spec/03 §6: reduced motion is the OS query OR the in-app toggle (mirrored
+   onto :root[data-reduced-motion] by App.tsx) - either one applies this. */
 @media (prefers-reduced-motion: reduce) {
   .overlay[data-expanded],
   .overlay[data-closed],
@@ -97,6 +99,13 @@
   .content[data-closed] {
     animation-duration: 80ms;
   }
+}
+
+:global(:root[data-reduced-motion="true"]) .overlay[data-expanded],
+:global(:root[data-reduced-motion="true"]) .overlay[data-closed],
+:global(:root[data-reduced-motion="true"]) .content[data-expanded],
+:global(:root[data-reduced-motion="true"]) .content[data-closed] {
+  animation-duration: 80ms;
 }
 
 .header {
@@ -162,6 +171,10 @@
   padding: 0.25rem 0;
 }
 
+.radioRow[data-disabled] {
+  opacity: 0.55;
+}
+
 .radioControl {
   display: inline-flex;
   align-items: center;
@@ -185,8 +198,19 @@
 }
 
 .radioLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   font-size: 0.95rem;
   color: var(--text);
+}
+
+.radioLockHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .switchRow {
@@ -316,4 +340,52 @@
   margin: 0;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.goalsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goalRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: 28px;
+}
+
+.goalCheck {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--accent);
+}
+
+/* Reserves the check icon's footprint on locked rows so title/description
+   text stays aligned with unlocked rows. */
+.goalIconSlot {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 0.15rem;
+}
+
+.goalText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.goalTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.goalDescription {
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }

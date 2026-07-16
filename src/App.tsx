@@ -1,4 +1,5 @@
 import { createEffect } from "solid-js";
+import AchievementToast from "./components/AchievementToast.tsx";
 import JuiceOverlay from "./components/JuiceOverlay.tsx";
 import PuzzleGrid from "./components/PuzzleGrid.tsx";
 import PuzzleUI from "./components/PuzzleUI.tsx";
@@ -7,7 +8,11 @@ import {
   createDebouncedSave,
   loadPersistedState,
 } from "./store/persistence.ts";
-import { createPuzzleStore, expireJuiceEvent } from "./store/puzzleStore.ts";
+import {
+  createPuzzleStore,
+  expireAchievementToast,
+  expireJuiceEvent,
+} from "./store/puzzleStore.ts";
 import styles from "./styles/Puzzle.module.css";
 
 function App() {
@@ -38,6 +43,17 @@ function App() {
     document.documentElement.dataset.theme = state.settings.theme;
   });
 
+  // spec/03 §6: reduced motion is the OS preference OR the settings toggle.
+  // The engine's own tweens/particles/shake already read settings.reducedMotion
+  // directly, but CSS-driven animations (dialogs, juice text, achievement
+  // toast) only have `prefers-reduced-motion` to go on - this attribute lets
+  // their stylesheets react to the in-app toggle too.
+  createEffect(() => {
+    document.documentElement.dataset.reducedMotion = String(
+      state.settings.reducedMotion,
+    );
+  });
+
   // spec/03 §5: uiAccent overrides --accent inline; classic/undefined falls
   // back to the CSS default for the current dark/light mode.
   createEffect(() => {
@@ -58,6 +74,10 @@ function App() {
         <JuiceOverlay
           events={state.juiceEvents}
           onExpire={(id) => expireJuiceEvent(setState, id)}
+        />
+        <AchievementToast
+          toasts={state.achievementToasts}
+          onExpire={(id) => expireAchievementToast(setState, id)}
         />
       </PuzzleGrid>
       <PuzzleUI store={store} />

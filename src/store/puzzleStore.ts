@@ -1,5 +1,6 @@
 import { batch } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
+import { newlyUnlocked } from "../game/achievements.ts";
 import type { ThemeMode } from "../render/theme.ts";
 
 export interface PuzzleStats {
@@ -39,6 +40,11 @@ export interface JuiceEvent {
   yPct: number;
 }
 
+export interface AchievementToast {
+  id: string;
+  title: string;
+}
+
 export interface PuzzleState {
   score: number;
   combo: number;
@@ -46,6 +52,7 @@ export interface PuzzleState {
   settings: PuzzleSettings;
   juiceEvents: JuiceEvent[];
   unlockedAchievements: string[];
+  achievementToasts: AchievementToast[];
   daily: DailyRecord | null;
 }
 
@@ -92,6 +99,7 @@ function createDefaultState(): PuzzleState {
     },
     juiceEvents: [],
     unlockedAchievements: [],
+    achievementToasts: [],
     daily: null,
   };
 }
@@ -114,13 +122,40 @@ export interface StepResultInput {
   juice: JuiceEvent | null;
 }
 
-// Called at cascade step boundaries only (spec/02 §5): one batch per step,
-// never per frame.
-export function applyStepResult(
+// Evaluated at the end of every stats-changing batch (spec/01 §9): never per
+// frame. Unlock is irreversible - newly-met achievements are appended to
+// both the persisted id list and the session-only toast queue. Returns
+// whether anything unlocked, so callers can play the unlock sound.
+function evaluateAchievements(
+  state: PuzzleState,
   setStore: SetStoreFunction<PuzzleState>,
+): boolean {
+  const unlocked = newlyUnlocked(state.stats, state.unlockedAchievements);
+  if (unlocked.length === 0) {
+    return false;
+  }
+  setStore("unlockedAchievements", (ids) => [
+    ...ids,
+    ...unlocked.map((achievement) => achievement.id),
+  ]);
+  setStore("achievementToasts", (toasts) => [
+    ...toasts,
+    ...unlocked.map((achievement) => ({
+      id: achievement.id,
+      title: achievement.title,
+    })),
+  ]);
+  return true;
+}
+
+// Called at cascade step boundaries only (spec/02 §5): one batch per step,
+// never per frame. Returns whether an achievement unlocked this step.
+export function applyStepResult(
+  store: PuzzleStore,
   step: StepResultInput,
-): void {
-  batch(() => {
+): boolean {
+  const [state, setStore] = store;
+  return batch(() => {
     setStore("score", (score) => score + step.scoreDelta);
     setStore("combo", step.combo);
     setStore("stats", "totalScore", (total) => total + step.scoreDelta);
@@ -147,6 +182,7 @@ export function applyStepResult(
         return [...trimmed, juice];
       });
     }
+    return evaluateAchievements(state, setStore);
   });
 }
 
@@ -154,8 +190,12 @@ export function resetCombo(setStore: SetStoreFunction<PuzzleState>): void {
   setStore("combo", 0);
 }
 
-export function recordShuffle(setStore: SetStoreFunction<PuzzleState>): void {
-  setStore("stats", "gamesShuffled", (count) => count + 1);
+export function recordShuffle(store: PuzzleStore): boolean {
+  const [state, setStore] = store;
+  return batch(() => {
+    setStore("stats", "gamesShuffled", (count) => count + 1);
+    return evaluateAchievements(state, setStore);
+  });
 }
 
 export function expireJuiceEvent(
@@ -164,5 +204,14 @@ export function expireJuiceEvent(
 ): void {
   setStore("juiceEvents", (events) =>
     events.filter((event) => event.id !== id),
+  );
+}
+
+export function expireAchievementToast(
+  setStore: SetStoreFunction<PuzzleState>,
+  id: string,
+): void {
+  setStore("achievementToasts", (toasts) =>
+    toasts.filter((toast) => toast.id !== id),
   );
 }

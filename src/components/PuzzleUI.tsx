@@ -73,8 +73,15 @@ function PuzzleUI(props: PuzzleUIProps) {
         Score: {state.score}
       </span>
       <div class={styles.buttonRow}>
-        <InfoDialog stats={state.stats} />
-        <SettingsDialog settings={state.settings} setStore={setState} />
+        <InfoDialog
+          stats={state.stats}
+          unlockedAchievements={state.unlockedAchievements}
+        />
+        <SettingsDialog
+          settings={state.settings}
+          setStore={setState}
+          unlockedAchievements={state.unlockedAchievements}
+        />
       </div>
     </div>
   );
