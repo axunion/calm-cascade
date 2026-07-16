@@ -14,6 +14,7 @@ import { vibrateMatch } from "../game/haptics.ts";
 import { type BoardRect, createInputController } from "../game/input.ts";
 import { type RenderOptions, renderBoard } from "../render/renderBoard.ts";
 import { getTheme } from "../render/theme.ts";
+import { resolveTheme } from "../render/themeLoader.ts";
 import {
   applyStepResult,
   type PuzzleStore,
@@ -69,7 +70,9 @@ function PuzzleGrid(props: PuzzleGridProps) {
 
     const renderOptions: RenderOptions = {
       cellSize: 0,
+      dpr: window.devicePixelRatio || 1,
       theme: getTheme(loop.settingsSnapshot.theme),
+      colorBlindShapes: state.settings.colorBlindShapes,
       selected: null,
       beams: loop.beams,
       particles: loop.particles,
@@ -80,8 +83,25 @@ function PuzzleGrid(props: PuzzleGridProps) {
     // §5): the hot loop reads this plain snapshot, never the store proxy.
     createEffect(() => {
       Object.assign(loop.settingsSnapshot, state.settings);
-      renderOptions.theme = getTheme(loop.settingsSnapshot.theme);
+      renderOptions.colorBlindShapes = state.settings.colorBlindShapes;
       audio.setEnabled(state.settings.sound);
+    });
+
+    // Dedicated effect reading only skin/theme (spec/02 §8) - other toggle
+    // changes above must not trigger a theme reload. Sets the built-in theme
+    // immediately, then swaps in the resolved one once ready; a generation
+    // token discards a resolution that finishes after a newer one started.
+    let themeGeneration = 0;
+    createEffect(() => {
+      const skin = state.settings.skin;
+      const mode = state.settings.theme;
+      const generation = ++themeGeneration;
+      renderOptions.theme = getTheme(mode);
+      resolveTheme(skin, mode).then((theme) => {
+        if (generation === themeGeneration) {
+          renderOptions.theme = theme;
+        }
+      });
     });
 
     let selectedCell: Cell | null = null;
@@ -107,6 +127,7 @@ function PuzzleGrid(props: PuzzleGridProps) {
       canvasRef.height = Math.max(1, Math.round(rect.height * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       cellSize = rect.width / BOARD_SIZE;
+      renderOptions.dpr = dpr;
       dirty = false;
     }
 
