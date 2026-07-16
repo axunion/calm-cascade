@@ -11,6 +11,7 @@ import {
   reshuffle,
 } from "../engine/board.ts";
 import { resolveStep, type StepResult } from "../engine/cascade.ts";
+import type { SpecialFire } from "../engine/fires.ts";
 import type { MatchGroup } from "../engine/matches.ts";
 import type { Rng } from "../engine/rng.ts";
 import { stepScore } from "../engine/scoring.ts";
@@ -40,9 +41,18 @@ import {
   updateTweens,
 } from "./animations.ts";
 import { comboJuice } from "./juice.ts";
-import { computeClearDelays, computeFireDelays } from "./laserTiming.ts";
+import {
+  computeClearDelays,
+  computeFireDelays,
+  type LaserFire,
+} from "./laserTiming.ts";
 import { createParticleSystem, type Particle } from "./particles.ts";
 import { createShakeSystem } from "./shake.ts";
+
+// A small screen-shake add-on for bomb's "flower opening" bloom (spec/01
+// §4.3) - much softer than a big combo's trauma, just enough to read as a
+// soft thump rather than the sharp jolt an "explosion" word would suggest.
+const BOMB_TRAUMA = 0.12;
 
 export type Phase =
   | "IDLE"
@@ -265,17 +275,41 @@ export function createGameLoop(
           ...matchCentroidPercent(step.matchGroups),
         }
       : null;
+    const lasersFired = step.fires.filter(
+      (fire) => fire.special === "laserH" || fire.special === "laserV",
+    ).length;
+    const bombsDetonated = step.fires.filter(
+      (fire) => fire.special === "bomb",
+    ).length;
     callbacks.onStepResolved({
       scoreDelta,
       combo,
       gemsCleared: step.clearedGems.length,
-      lasersFired: step.laserFires.length,
+      lasersFired,
+      bombsDetonated,
       juice,
     });
     // No reducedMotion guard here: updateShake() unconditionally zeroes
     // trauma every frame while reducedMotion is on, so it's the sole
     // gatekeeper and this stays correct either way.
-    shakeSystem.addTrauma(info.trauma);
+    shakeSystem.addTrauma(info.trauma + bombsDetonated * BOMB_TRAUMA);
+  }
+
+  // gameLoop is the one place that converts the engine's generalized
+  // SpecialFire[] (laser + bomb, and later prism) down to the laser-only
+  // shape laserTiming.ts expects - that module's API stays laser-specific
+  // and unchanged (spec/05 phase 10).
+  function laserFiresOf(fires: SpecialFire[]): LaserFire[] {
+    const laserFires: LaserFire[] = [];
+    for (const fire of fires) {
+      if (fire.special === "laserH" || fire.special === "laserV") {
+        laserFires.push({
+          cell: fire.cell,
+          orientation: fire.special === "laserH" ? "h" : "v",
+        });
+      }
+    }
+    return laserFires;
   }
 
   interface LaserEffects {
@@ -292,16 +326,17 @@ export function createGameLoop(
     swap: SwapInfo | null,
     t: Timings,
   ): LaserEffects {
-    if (step.laserFires.length === 0) {
+    const laserFires = laserFiresOf(step.fires);
+    if (laserFires.length === 0) {
       return { clearDelays: new Map(), maxEndTime: 0 };
     }
     const fireDelays = t.reducedMotion
-      ? step.laserFires.map(() => 0)
-      : computeFireDelays(step.laserFires, step.matchGroups, swap);
+      ? laserFires.map(() => 0)
+      : computeFireDelays(laserFires, step.matchGroups, swap);
     const beamDuration = t.reducedMotion ? t.clearAlpha : BEAM_DURATION_MS;
     let maxEndTime = 0;
 
-    step.laserFires.forEach((fire, i) => {
+    laserFires.forEach((fire, i) => {
       const origin = step.clearedGems.find((c) =>
         cellsEqual(c.cell, fire.cell),
       );
@@ -317,7 +352,7 @@ export function createGameLoop(
     });
 
     return {
-      clearDelays: computeClearDelays(step.laserFires, fireDelays),
+      clearDelays: computeClearDelays(laserFires, fireDelays),
       maxEndTime,
     };
   }

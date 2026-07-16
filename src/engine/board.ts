@@ -4,12 +4,16 @@ import type { Rng } from "./rng.ts";
 export const BOARD_SIZE = 8;
 export const GEM_KINDS = 6;
 
-export type Special = "none" | "laserH" | "laserV";
+export type Special = "none" | "laserH" | "laserV" | "bomb";
 
 export interface Gem {
   id: number;
   kind: number;
   special: Special;
+  // 0 = none, 1+ = ice layers. Field added ahead of the ice mechanic itself
+  // (phase 14) so every Gem literal across the codebase settles on a shape
+  // now rather than needing a second mechanical pass later.
+  ice: number;
 }
 
 export type Board = (Gem | null)[];
@@ -75,6 +79,7 @@ function buildRandomBoard(rng: Rng, nextId: NextId): Board {
         id: nextId(),
         kind: pickKind(rng, forbiddenKinds(board, row, col)),
         special: "none",
+        ice: 0,
       };
     }
   }

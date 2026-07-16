@@ -3,7 +3,12 @@ import type { Sprite } from "../game/animations.ts";
 import type { Particle } from "../game/particles.ts";
 import { type BeamEffect, drawBeams, drawParticles } from "./effects.ts";
 import { getScaledBackground, getScaledGem } from "./scaledBitmaps.ts";
-import { gemShapePath, laserArrowPath, type Theme } from "./theme.ts";
+import {
+  bombIconPath,
+  gemShapePath,
+  laserArrowPath,
+  type Theme,
+} from "./theme.ts";
 
 export interface RenderOptions {
   cellSize: number;
@@ -108,8 +113,10 @@ function drawGems(
         drawGemOutline(ctx, sprite.kind, cellSize);
       }
     }
-    if (sprite.special !== "none") {
+    if (sprite.special === "laserH" || sprite.special === "laserV") {
       drawLaserArrow(ctx, sprite.special === "laserH" ? "h" : "v", cellSize);
+    } else if (sprite.special === "bomb") {
+      drawBombIcon(ctx, cellSize);
     }
     ctx.restore();
   });
@@ -165,6 +172,17 @@ function drawLaserArrow(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.stroke(laserArrowPath(orientation, cellSize));
+  ctx.restore();
+}
+
+// Same fixed near-white stroke as the laser arrow - color-independent so the
+// bud glyph reads over any gem color (spec/03 §6).
+function drawBombIcon(ctx: CanvasRenderingContext2D, cellSize: number): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = Math.max(1.5, cellSize * 0.04);
+  ctx.lineCap = "round";
+  ctx.stroke(bombIconPath(cellSize));
   ctx.restore();
 }
 

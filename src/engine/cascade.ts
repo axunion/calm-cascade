@@ -10,7 +10,7 @@ import {
   isSpecialPair,
   type NextId,
 } from "./board.ts";
-import { type LaserFire, resolveLaserFires } from "./lasers.ts";
+import { resolveSpecialFires, type SpecialFire } from "./fires.ts";
 import { findMatches, type MatchGroup } from "./matches.ts";
 import type { Rng } from "./rng.ts";
 import { planSpecialSpawns, type SpecialSpawn } from "./specials.ts";
@@ -30,7 +30,7 @@ export interface Spawn {
 export interface StepResult {
   board: Board;
   clearedGems: { cell: Cell; gem: Gem }[];
-  laserFires: LaserFire[];
+  fires: SpecialFire[];
   specialSpawns: SpecialSpawn[];
   falls: Fall[];
   spawns: Spawn[];
@@ -38,8 +38,8 @@ export interface StepResult {
 }
 
 // A swap involves two cells; unlike a plain Cell | null "which cell moved"
-// hint, both are needed to detect a laser-laser swap (spec/01 §4.4), which
-// must fire even though it produces no color match. The id-generation
+// hint, both are needed to detect a special-special swap (spec/01 §4.4),
+// which must fire even though it produces no color match. The id-generation
 // mechanism itself is left unspecified by spec/02 — NextId is injected here
 // the same way Rng is, to keep this module free of hidden mutable state.
 export interface SwapInfo {
@@ -47,7 +47,7 @@ export interface SwapInfo {
   b: Cell;
 }
 
-function isLaserLaserSwap(board: Board, swap: SwapInfo): boolean {
+function isSpecialSpecialSwap(board: Board, swap: SwapInfo): boolean {
   return isSpecialPair(
     board[idx(swap.a.row, swap.a.col)],
     board[idx(swap.b.row, swap.b.col)],
@@ -117,6 +117,7 @@ export function spawnGems(
         id: nextId(),
         kind: Math.floor(rng() * GEM_KINDS),
         special: "none",
+        ice: 0,
       };
       next[idx(row, col)] = gem;
       spawns.push({ gem, to: { row, col }, fromAboveRows: emptyCount - row });
@@ -133,9 +134,9 @@ export function resolveStep(
   swap: SwapInfo | null,
 ): StepResult | null {
   const matchGroups = findMatches(board);
-  const forcedLaserSwap = swap !== null && isLaserLaserSwap(board, swap);
+  const forcedSpecialSwap = swap !== null && isSpecialSpecialSwap(board, swap);
 
-  if (matchGroups.length === 0 && !forcedLaserSwap) {
+  if (matchGroups.length === 0 && !forcedSpecialSwap) {
     return null;
   }
 
@@ -146,9 +147,10 @@ export function resolveStep(
   );
 
   // Seed cells for this step's clear: every matched cell, plus (for a
-  // laser-laser swap with no color match) the two swapped cells themselves.
+  // special-special swap with no color match) the two swapped cells
+  // themselves.
   const seedCells = matchGroups.flatMap((group) => group.cells);
-  if (forcedLaserSwap && swap) {
+  if (forcedSpecialSwap && swap) {
     seedCells.push(swap.a, swap.b);
   }
   const initialCleared = new Set<number>();
@@ -159,7 +161,7 @@ export function resolveStep(
     }
   }
 
-  const { cleared, fires } = resolveLaserFires(board, initialCleared);
+  const { cleared, fires } = resolveSpecialFires(board, initialCleared);
 
   const clearedGems: { cell: Cell; gem: Gem }[] = [];
   const working: Board = board.slice();
@@ -179,7 +181,7 @@ export function resolveStep(
     const existingGem = board[cellIndex];
     working[cellIndex] = existingGem
       ? { ...existingGem, special: spawn.special }
-      : { id: nextId(), kind: spawn.kind, special: spawn.special };
+      : { id: nextId(), kind: spawn.kind, special: spawn.special, ice: 0 };
   }
 
   const { board: afterGravity, falls } = applyGravity(working);
@@ -188,7 +190,7 @@ export function resolveStep(
   return {
     board: finalBoard,
     clearedGems,
-    laserFires: fires,
+    fires,
     specialSpawns,
     falls,
     spawns,

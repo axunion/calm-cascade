@@ -109,6 +109,7 @@ export interface StepResultInput {
   combo: number;
   gemsCleared: number;
   lasersFired: number;
+  bombsDetonated: number;
   juice: JuiceEvent | null;
 }
 
@@ -126,6 +127,13 @@ export function applyStepResult(
     setStore("stats", "bestCombo", (best) => Math.max(best, step.combo));
     if (step.lasersFired > 0) {
       setStore("stats", "lasersFired", (count) => count + step.lasersFired);
+    }
+    if (step.bombsDetonated > 0) {
+      setStore(
+        "stats",
+        "bombsDetonated",
+        (count) => count + step.bombsDetonated,
+      );
     }
     if (step.juice) {
       const juice = step.juice;

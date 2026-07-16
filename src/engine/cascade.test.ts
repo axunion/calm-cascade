@@ -152,7 +152,7 @@ describe("resolveStep", () => {
     });
 
     expect(result).not.toBeNull();
-    expect(result?.laserFires).toHaveLength(2);
+    expect(result?.fires).toHaveLength(2);
   });
 });
 

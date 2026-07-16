@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { idx } from "../engine/board.ts";
-import type { LaserFire } from "../engine/lasers.ts";
 import type { MatchGroup } from "../engine/matches.ts";
-import { computeClearDelays, computeFireDelays } from "./laserTiming.ts";
+import {
+  computeClearDelays,
+  computeFireDelays,
+  type LaserFire,
+} from "./laserTiming.ts";
 
 function matchGroup(cells: { row: number; col: number }[]): MatchGroup {
   return { cells, orientation: "h", kind: 0 };

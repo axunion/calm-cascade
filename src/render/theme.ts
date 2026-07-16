@@ -180,3 +180,36 @@ function axisArrowPath(cellSize: number, horizontal: boolean): Path2D {
   path.lineTo(...point(-half + head, head));
   return path;
 }
+
+// Drawn on top of a bomb gem's shape (spec/01 §4.3, spec/03 color-blind
+// support): a small bud with four petal strokes, evoking the "bloom" the
+// bomb's clear plays as (never an explosion glyph, per the Calm pillar) -
+// color-independent, the same way gem shapes stand in for kind.
+let cachedBombIcon: Path2D | null = null;
+let bombIconCacheCellSize = -1;
+
+export function bombIconPath(cellSize: number): Path2D {
+  if (cellSize !== bombIconCacheCellSize) {
+    cachedBombIcon = null;
+    bombIconCacheCellSize = cellSize;
+  }
+  cachedBombIcon ??= buildBombIconPath(cellSize);
+  return cachedBombIcon;
+}
+
+function buildBombIconPath(cellSize: number): Path2D {
+  const r = cellSize * 0.14;
+  const petal = cellSize * 0.1;
+  const path = new Path2D();
+  path.arc(0, 0, r, 0, Math.PI * 2);
+  for (let i = 0; i < 4; i++) {
+    const angle = (Math.PI / 2) * i + Math.PI / 4;
+    const innerX = Math.cos(angle) * r;
+    const innerY = Math.sin(angle) * r;
+    const outerX = Math.cos(angle) * (r + petal);
+    const outerY = Math.sin(angle) * (r + petal);
+    path.moveTo(innerX, innerY);
+    path.lineTo(outerX, outerY);
+  }
+  return path;
+}

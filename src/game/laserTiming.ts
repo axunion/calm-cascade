@@ -1,9 +1,17 @@
 import { BOARD_SIZE, type Cell, cellsEqual, idx } from "../engine/board.ts";
 import type { SwapInfo } from "../engine/cascade.ts";
-import type { LaserFire } from "../engine/lasers.ts";
 import type { MatchGroup } from "../engine/matches.ts";
 
 export const BEAM_STAGGER_MS = 18;
+
+// gameLoop.ts filters StepResult.fires down to the laser-only subset and
+// converts each SpecialFire (`{ cell, special }`) into this shape before
+// calling into this module - this module's own API (this type included)
+// stays laser-specific and unchanged by engine/fires.ts's generalization.
+export interface LaserFire {
+  cell: Cell;
+  orientation: "h" | "v";
+}
 
 // Distance in cells from `from` to `to` along `orientation`'s sweep line, or
 // null if `to` isn't on that line at all.
@@ -38,7 +46,7 @@ function isRootFire(
 // (spec/04 §2.5); a "root" fire - matched directly, or part of a
 // laser-laser swap - begins with the step itself (delay 0), never chained
 // even if its cell happens to sit on another root's row/col.
-// `fires` is already in BFS trigger order (engine/lasers.ts), so a chained
+// `fires` is already in BFS trigger order (engine/fires.ts), so a chained
 // fire's trigger is always an earlier entry in this array. If more than one
 // earlier fire's line could have swept it, the first (by BFS order) is used;
 // this is a presentation-only approximation when that's ambiguous - it never
