@@ -1,7 +1,10 @@
 import { batch } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
 import { newlyUnlocked } from "../game/achievements.ts";
+import { todayKey } from "../game/daily.ts";
 import type { ThemeMode } from "../render/theme.ts";
+
+export type GameMode = "endless" | "daily";
 
 export interface PuzzleStats {
   totalScore: number;
@@ -48,6 +51,7 @@ export interface AchievementToast {
 export interface PuzzleState {
   score: number;
   combo: number;
+  mode: GameMode;
   stats: PuzzleStats;
   settings: PuzzleSettings;
   juiceEvents: JuiceEvent[];
@@ -77,6 +81,7 @@ function createDefaultState(): PuzzleState {
   return {
     score: 0,
     combo: 0,
+    mode: "endless",
     stats: {
       totalScore: 0,
       bestCombo: 0,
@@ -194,6 +199,51 @@ export function recordShuffle(store: PuzzleStore): boolean {
   const [state, setStore] = store;
   return batch(() => {
     setStore("stats", "gamesShuffled", (count) => count + 1);
+    return evaluateAchievements(state, setStore);
+  });
+}
+
+// spec/01 §8: switching modes always starts a fresh session score. The first
+// switch to daily on a given date resets that day's record and counts as
+// that day's first play; switching back later the same day is a no-op on
+// dailiesPlayed/daily.bestScore. Returns whether an achievement unlocked.
+export function switchToDaily(store: PuzzleStore): boolean {
+  const [state, setStore] = store;
+  const dateKey = todayKey();
+  return batch(() => {
+    setStore("mode", "daily");
+    setStore("score", 0);
+    setStore("combo", 0);
+    if (state.daily?.date === dateKey) {
+      return false;
+    }
+    setStore("daily", { date: dateKey, bestScore: 0 });
+    setStore("stats", "dailiesPlayed", (count) => count + 1);
+    return evaluateAchievements(state, setStore);
+  });
+}
+
+export function switchToEndless(setStore: SetStoreFunction<PuzzleState>): void {
+  batch(() => {
+    setStore("mode", "endless");
+    setStore("score", 0);
+    setStore("combo", 0);
+  });
+}
+
+// spec/01 §8: only the day's best score is kept, saved when a cascade ends
+// with a new best. A no-op outside daily mode, so a stale `daily` record
+// from a previous day never gets overwritten by endless-mode scores.
+export function recordDailyBest(store: PuzzleStore): boolean {
+  const [state, setStore] = store;
+  if (state.mode !== "daily" || !state.daily) {
+    return false;
+  }
+  if (state.score <= state.daily.bestScore) {
+    return false;
+  }
+  return batch(() => {
+    setStore("daily", "bestScore", state.score);
     return evaluateAchievements(state, setStore);
   });
 }

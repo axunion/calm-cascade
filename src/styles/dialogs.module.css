@@ -389,3 +389,53 @@
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+.dailyDate {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.dailyBest {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.flowerRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.flower {
+  font-size: 1.6rem;
+  opacity: 0.3;
+  filter: grayscale(1);
+  transition:
+    opacity 200ms ease,
+    filter 200ms ease;
+}
+
+.flowerLit {
+  opacity: 1;
+  filter: none;
+}
+
+.dailySwitchButton {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--bg-elevated);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dailySwitchButton:active {
+  transform: scale(0.98);
+  transition: transform 100ms ease;
+}

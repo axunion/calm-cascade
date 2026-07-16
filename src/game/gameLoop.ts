@@ -13,7 +13,7 @@ import {
 import { resolveStep, type StepResult } from "../engine/cascade.ts";
 import type { SpecialFire } from "../engine/fires.ts";
 import type { MatchGroup } from "../engine/matches.ts";
-import type { Rng } from "../engine/rng.ts";
+import { mulberry32, type Rng } from "../engine/rng.ts";
 import { stepScore } from "../engine/scoring.ts";
 import { applySwap, isValidSwap } from "../engine/swap.ts";
 import {
@@ -147,8 +147,15 @@ export function createGameLoop(
   const sprites = buildInitialSprites(board);
   const tweens: Tween[] = [];
   const beams: BeamEffect[] = [];
-  const particles = createParticleSystem(rng);
-  const shakeSystem = createShakeSystem(rng);
+  // Cosmetic-only randomness (particle drift, shake wobble) must never share
+  // `rng` with the deterministic engine calls below (resolveStep/reshuffle) -
+  // shake.update() draws from it unconditionally every rAF frame regardless
+  // of game state, so sharing a stream would make the daily challenge's
+  // refill sequence depend on wall-clock frame timing instead of purely on
+  // the swap sequence (spec/01 §8, spec/02 §3's determinism guarantee).
+  const cosmeticRng = mulberry32(Date.now());
+  const particles = createParticleSystem(cosmeticRng);
+  const shakeSystem = createShakeSystem(cosmeticRng);
   const settingsSnapshot: PuzzleSettings = { ...initialSettings };
 
   let phaseTimer: number | null = null;

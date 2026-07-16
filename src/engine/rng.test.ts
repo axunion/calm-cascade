@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mulberry32 } from "./rng.ts";
+import { mulberry32, seedFromString } from "./rng.ts";
 
 describe("mulberry32", () => {
   it("returns numbers in [0, 1)", () => {
@@ -23,5 +23,23 @@ describe("mulberry32", () => {
     const a = mulberry32(1);
     const b = mulberry32(2);
     expect(a()).not.toBe(b());
+  });
+});
+
+describe("seedFromString", () => {
+  it("is a fixed value for a given string (snapshot)", () => {
+    expect(seedFromString("daily:2026-07-15")).toBe(855967641);
+  });
+
+  it("differs for a different date", () => {
+    expect(seedFromString("daily:2026-07-15")).not.toBe(
+      seedFromString("daily:2026-07-16"),
+    );
+  });
+
+  it("differs for a different prefix on the same date", () => {
+    expect(seedFromString("daily:2026-07-15")).not.toBe(
+      seedFromString("other:2026-07-15"),
+    );
   });
 });

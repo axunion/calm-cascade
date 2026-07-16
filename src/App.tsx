@@ -1,8 +1,9 @@
-import { createEffect } from "solid-js";
+import { createEffect, Show } from "solid-js";
 import AchievementToast from "./components/AchievementToast.tsx";
 import JuiceOverlay from "./components/JuiceOverlay.tsx";
 import PuzzleGrid from "./components/PuzzleGrid.tsx";
 import PuzzleUI from "./components/PuzzleUI.tsx";
+import { createDailyRun, todayKey } from "./game/daily.ts";
 import { getUiAccent } from "./render/themeRegistry.ts";
 import {
   createDebouncedSave,
@@ -70,16 +71,30 @@ function App() {
       <div class={styles.topSpacer} aria-hidden="true">
         Calm Cascade
       </div>
-      <PuzzleGrid store={store}>
-        <JuiceOverlay
-          events={state.juiceEvents}
-          onExpire={(id) => expireJuiceEvent(setState, id)}
-        />
-        <AchievementToast
-          toasts={state.achievementToasts}
-          onExpire={(id) => expireAchievementToast(setState, id)}
-        />
-      </PuzzleGrid>
+      {/* spec/02 §8: keyed on mode so switching endless <-> daily fully
+          remounts PuzzleGrid - no in-flight game state survives the switch. */}
+      <Show when={state.mode} keyed>
+        {(mode) => {
+          const dailyRun = mode === "daily" ? createDailyRun(todayKey()) : null;
+          return (
+            <PuzzleGrid
+              store={store}
+              board={dailyRun?.board}
+              rng={dailyRun?.rng}
+              nextId={dailyRun?.nextId}
+            >
+              <JuiceOverlay
+                events={state.juiceEvents}
+                onExpire={(id) => expireJuiceEvent(setState, id)}
+              />
+              <AchievementToast
+                toasts={state.achievementToasts}
+                onExpire={(id) => expireAchievementToast(setState, id)}
+              />
+            </PuzzleGrid>
+          );
+        }}
+      </Show>
       <PuzzleUI store={store} />
     </>
   );

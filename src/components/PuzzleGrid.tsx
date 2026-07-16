@@ -2,11 +2,13 @@ import type { JSX } from "solid-js";
 import { createEffect, onCleanup, onMount } from "solid-js";
 import {
   BOARD_SIZE,
+  type Board,
   type Cell,
   createBoard,
   createIdGenerator,
+  type NextId,
 } from "../engine/board.ts";
-import { mulberry32 } from "../engine/rng.ts";
+import { mulberry32, type Rng } from "../engine/rng.ts";
 import { clampDt } from "../game/animations.ts";
 import { createAudioEngine } from "../game/audio.ts";
 import { createGameLoop } from "../game/gameLoop.ts";
@@ -18,6 +20,7 @@ import { resolveTheme } from "../render/themeLoader.ts";
 import {
   applyStepResult,
   type PuzzleStore,
+  recordDailyBest,
   recordShuffle,
   resetCombo,
 } from "../store/puzzleStore.ts";
@@ -25,6 +28,11 @@ import styles from "../styles/Puzzle.module.css";
 
 export interface PuzzleGridProps {
   store: PuzzleStore;
+  // Injected for the daily challenge (spec/02 §8); endless mode omits these
+  // and falls back to a Date.now() seed, as before.
+  board?: Board;
+  rng?: Rng;
+  nextId?: NextId;
   children?: JSX.Element;
 }
 
@@ -40,41 +48,39 @@ function PuzzleGrid(props: PuzzleGridProps) {
     }
     const ctx: CanvasRenderingContext2D = maybeCtx;
 
-    const rng = mulberry32(Date.now());
-    const nextId = createIdGenerator();
+    const rng = props.rng ?? mulberry32(Date.now());
+    const nextId = props.nextId ?? createIdGenerator();
+    const board = props.board ?? createBoard(rng, nextId);
     const audio = createAudioEngine();
-    const loop = createGameLoop(
-      createBoard(rng, nextId),
-      rng,
-      nextId,
-      state.settings,
-      {
-        onStepResolved(info) {
-          const unlocked = applyStepResult(props.store, info);
-          if (info.gemsCleared > 0) {
-            audio.playMatch(info.combo);
-          }
-          if (info.lasersFired > 0) {
-            audio.playLaser();
-          }
-          if (info.prismsFired > 0) {
-            audio.playPrism();
-          }
-          if (unlocked) {
-            audio.playAchievement();
-          }
-          vibrateMatch(loop.settingsSnapshot.haptics, Boolean(info.juice));
-        },
-        onCascadeEnd() {
-          resetCombo(setState);
-        },
-        onShuffle() {
-          if (recordShuffle(props.store)) {
-            audio.playAchievement();
-          }
-        },
+    const loop = createGameLoop(board, rng, nextId, state.settings, {
+      onStepResolved(info) {
+        const unlocked = applyStepResult(props.store, info);
+        if (info.gemsCleared > 0) {
+          audio.playMatch(info.combo);
+        }
+        if (info.lasersFired > 0) {
+          audio.playLaser();
+        }
+        if (info.prismsFired > 0) {
+          audio.playPrism();
+        }
+        if (unlocked) {
+          audio.playAchievement();
+        }
+        vibrateMatch(loop.settingsSnapshot.haptics, Boolean(info.juice));
       },
-    );
+      onCascadeEnd() {
+        resetCombo(setState);
+        if (recordDailyBest(props.store)) {
+          audio.playAchievement();
+        }
+      },
+      onShuffle() {
+        if (recordShuffle(props.store)) {
+          audio.playAchievement();
+        }
+      },
+    });
 
     const renderOptions: RenderOptions = {
       cellSize: 0,
