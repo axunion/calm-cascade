@@ -13,6 +13,7 @@ import {
 import { resolveStep, type StepResult } from "../engine/cascade.ts";
 import type { MatchGroup } from "../engine/matches.ts";
 import type { Rng } from "../engine/rng.ts";
+import { stepScore } from "../engine/scoring.ts";
 import { applySwap, isValidSwap } from "../engine/swap.ts";
 import {
   BEAM_DURATION_MS,
@@ -254,7 +255,7 @@ export function createGameLoop(
   }
 
   function reportStep(step: StepResult): void {
-    const scoreDelta = step.clearedGems.length * 10 * combo;
+    const scoreDelta = stepScore(step.clearedGems.length, combo);
     const info = comboJuice(combo);
     const juice: JuiceEvent | null = info.text
       ? {
