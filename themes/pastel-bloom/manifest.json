@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "displayName": "Pastel Bloom",
+  "gems": [null, null, null, null, null, null],
+  "background": null,
+  "colors": {
+    "gemColors": [
+      "#f7a8c4",
+      "#f7c99b",
+      "#f2e6a1",
+      "#a8dab5",
+      "#9fd0e6",
+      "#c9b6ea"
+    ],
+    "boardTileA": "#2b2233",
+    "boardTileB": "#332942",
+    "selectionRing": "#e0b3f5",
+    "uiAccent": "#e0b3f5"
+  },
+  "colorsLight": {
+    "boardTileA": "#f7f1fb",
+    "boardTileB": "#efe4f7",
+    "uiAccent": "#c17fe0"
+  }
+}
