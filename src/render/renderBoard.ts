@@ -25,14 +25,23 @@ export function renderBoard(
   sprites: ReadonlyMap<number, Sprite>,
   options: RenderOptions,
 ): void {
-  const { cellSize, dpr, theme, selected, beams, particles, shake } = options;
+  const {
+    cellSize,
+    dpr,
+    theme,
+    colorBlindShapes,
+    selected,
+    beams,
+    particles,
+    shake,
+  } = options;
   const boardPx = cellSize * BOARD_SIZE;
 
   ctx.clearRect(0, 0, boardPx, boardPx);
   ctx.save();
   ctx.translate(shake.x, shake.y);
   drawBackground(ctx, theme, cellSize, dpr);
-  drawGems(ctx, sprites, theme, cellSize, dpr);
+  drawGems(ctx, sprites, theme, cellSize, dpr, colorBlindShapes);
   drawBeams(ctx, beams, theme, cellSize);
   drawParticles(ctx, particles, theme, cellSize);
   ctx.restore();
@@ -68,6 +77,7 @@ function drawGems(
   theme: Theme,
   cellSize: number,
   dpr: number,
+  colorBlindShapes: boolean,
 ): void {
   // Map#forEach avoids allocating a JS-visible iterator object every frame
   // (unlike `for...of sprites.values()`), keeping this hot-path call free of
@@ -88,15 +98,58 @@ function drawGems(
     if (gemImage) {
       const size = cellSize * 0.9;
       ctx.drawImage(gemImage, -size / 2, -size / 2, size, size);
+      if (colorBlindShapes) {
+        drawGemGlyph(ctx, sprite.kind, cellSize);
+      }
     } else {
       ctx.fillStyle = theme.gemColors[sprite.kind];
       ctx.fill(gemShapePath(sprite.kind, cellSize));
+      if (colorBlindShapes) {
+        drawGemOutline(ctx, sprite.kind, cellSize);
+      }
     }
     if (sprite.special !== "none") {
       drawLaserArrow(ctx, sprite.special === "laserH" ? "h" : "v", cellSize);
     }
     ctx.restore();
   });
+}
+
+// spec/03 §6 color-blind support, vector branch: stroke the same Path2D used
+// for the fill so the shape's outline stands out against the fill color.
+function drawGemOutline(
+  ctx: CanvasRenderingContext2D,
+  kind: number,
+  cellSize: number,
+): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.lineWidth = cellSize * 0.05;
+  ctx.stroke(gemShapePath(kind, cellSize));
+  ctx.restore();
+}
+
+// spec/03 §6 color-blind support, image branch: a small shape glyph over the
+// gem image so the shape channel works even when the theme is image-based.
+// Shrunk via ctx.scale, never a second gemShapePath(kind, differentCellSize)
+// call - that would defeat the shapeCache's single-cellSize invalidation
+// (spec/04 §1.3's shapeCache trap).
+function drawGemGlyph(
+  ctx: CanvasRenderingContext2D,
+  kind: number,
+  cellSize: number,
+): void {
+  ctx.save();
+  ctx.scale(0.45, 0.45);
+  const glyph = gemShapePath(kind, cellSize);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill(glyph);
+  ctx.strokeStyle = "rgba(20, 16, 28, 0.8)";
+  // lineWidth is drawn under the 0.45 ctx.scale above, so it renders at
+  // ~cellSize * 0.036 on screen - thin, but still legible over gem art.
+  ctx.lineWidth = cellSize * 0.08;
+  ctx.stroke(glyph);
+  ctx.restore();
 }
 
 // Stroked in a fixed near-white so the sweep axis reads over any gem color
