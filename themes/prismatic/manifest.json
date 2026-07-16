@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "displayName": "Prismatic Bloom",
+  "gems": [
+    "gem-0.png",
+    "gem-1.png",
+    "gem-2.png",
+    "gem-3.png",
+    "gem-4.png",
+    "gem-5.png"
+  ],
+  "background": "background.png",
+  "colors": {
+    "gemColors": [
+      "#f7c9d6",
+      "#f7dfae",
+      "#f2ecab",
+      "#b9e6c8",
+      "#b3d6f0",
+      "#d6bdf0"
+    ],
+    "boardTileA": "#2d2438",
+    "boardTileB": "#362b42",
+    "selectionRing": "#e0b3f5",
+    "uiAccent": "#e0b3f5"
+  },
+  "colorsLight": {
+    "boardTileA": "#f4eef9",
+    "boardTileB": "#ece2f5",
+    "uiAccent": "#b98be0"
+  }
+}
