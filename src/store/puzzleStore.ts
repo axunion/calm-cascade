@@ -110,6 +110,7 @@ export interface StepResultInput {
   gemsCleared: number;
   lasersFired: number;
   bombsDetonated: number;
+  prismsFired: number;
   juice: JuiceEvent | null;
 }
 
@@ -134,6 +135,9 @@ export function applyStepResult(
         "bombsDetonated",
         (count) => count + step.bombsDetonated,
       );
+    }
+    if (step.prismsFired > 0) {
+      setStore("stats", "prismsFired", (count) => count + step.prismsFired);
     }
     if (step.juice) {
       const juice = step.juice;

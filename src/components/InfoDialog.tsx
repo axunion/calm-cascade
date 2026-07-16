@@ -1,6 +1,14 @@
 import { Dialog } from "@kobalte/core/dialog";
 import { Tabs } from "@kobalte/core/tabs";
-import { ArrowLeftRight, Info, Sparkles, X, Zap } from "lucide-solid";
+import {
+  ArrowLeftRight,
+  Flower2,
+  Gem,
+  Info,
+  Sparkles,
+  X,
+  Zap,
+} from "lucide-solid";
 import type { JSX } from "solid-js";
 import type { PuzzleStats } from "../store/puzzleStore.ts";
 import dialogStyles from "../styles/dialogs.module.css";
@@ -27,6 +35,14 @@ const HOW_TO_STEPS: HowToStep[] = [
   {
     icon: Zap,
     text: "Match 4 in a row to create a laser gem - swap two lasers for a cross-clear.",
+  },
+  {
+    icon: Flower2,
+    text: "Match an L or T shape to create a bomb gem - it blooms open across a 3x3 area.",
+  },
+  {
+    icon: Gem,
+    text: "Match 5 in a row to create a prism gem - it clears every gem of that color.",
   },
 ];
 

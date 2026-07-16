@@ -188,4 +188,58 @@ describe("resolveSpecialFires", () => {
       }
     }
   });
+
+  it("prism clears every gem of its kind on the board, itself included", () => {
+    const board = boardFromStrings(PLAIN);
+    const prismIndex = idx(4, 4);
+    const kind = 2;
+    board[prismIndex] = { id: 999, kind, special: "prism", ice: 0 };
+    const otherA = idx(0, 0);
+    const otherB = idx(7, 7);
+    board[otherA] = { id: 1000, kind, special: "none", ice: 0 };
+    board[otherB] = { id: 1001, kind, special: "none", ice: 0 };
+
+    const { cleared } = resolveSpecialFires(board, new Set([prismIndex]));
+
+    expect(cleared.has(prismIndex)).toBe(true);
+    expect(cleared.has(otherA)).toBe(true);
+    expect(cleared.has(otherB)).toBe(true);
+  });
+
+  it("chain-fires a prism caught by a laser's sweep", () => {
+    const board = boardFromStrings(PLAIN);
+    const laserIndex = idx(3, 2); // laserH — sweeps row 3, including col 5
+    const prismIndex = idx(3, 5);
+    const kind = 3;
+    board[laserIndex] = { id: 1, kind: 0, special: "laserH", ice: 0 };
+    board[prismIndex] = { id: 2, kind, special: "prism", ice: 0 };
+    const other = idx(6, 6);
+    board[other] = { id: 3, kind, special: "none", ice: 0 };
+
+    const { cleared, fires } = resolveSpecialFires(
+      board,
+      new Set([laserIndex]),
+    );
+
+    expect(fires.map((f) => f.special).sort()).toEqual(["laserH", "prism"]);
+    expect(cleared.has(other)).toBe(true);
+  });
+
+  it("fires both prisms from their swapped positions, clearing both kinds", () => {
+    const board = boardFromStrings(PLAIN);
+    const a = idx(4, 4);
+    const b = idx(4, 5);
+    board[a] = { id: 1, kind: 0, special: "prism", ice: 0 };
+    board[b] = { id: 2, kind: 1, special: "prism", ice: 0 };
+    const otherKind0 = idx(0, 0);
+    const otherKind1 = idx(7, 7);
+    board[otherKind0] = { id: 3, kind: 0, special: "none", ice: 0 };
+    board[otherKind1] = { id: 4, kind: 1, special: "none", ice: 0 };
+
+    const { cleared, fires } = resolveSpecialFires(board, new Set([a, b]));
+
+    expect(fires).toHaveLength(2);
+    expect(cleared.has(otherKind0)).toBe(true);
+    expect(cleared.has(otherKind1)).toBe(true);
+  });
 });

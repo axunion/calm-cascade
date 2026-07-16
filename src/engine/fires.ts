@@ -44,21 +44,42 @@ function bombSweepIndices(cell: Cell): number[] {
   return indices;
 }
 
-function sweepIndicesFor(special: SpecialKind, cell: Cell): number[] {
+// Every gem of `kind` on the board, firing cell included (spec/01 §4: prism).
+function prismSweepIndices(board: Board, kind: number): number[] {
+  const indices: number[] = [];
+  for (let i = 0; i < board.length; i++) {
+    const gem = board[i];
+    if (gem && gem.kind === kind) {
+      indices.push(i);
+    }
+  }
+  return indices;
+}
+
+function sweepIndicesFor(
+  board: Board,
+  special: SpecialKind,
+  cell: Cell,
+  kind: number,
+): number[] {
   if (special === "laserH") {
     return laserSweepIndices("h", cell);
   }
   if (special === "laserV") {
     return laserSweepIndices("v", cell);
   }
+  if (special === "prism") {
+    return prismSweepIndices(board, kind);
+  }
   return bombSweepIndices(cell);
 }
 
 // BFS from the cells cleared by a match (or a special-special swap): any
 // special piece among them fires, sweeping its effect area (laser =
-// row/column, bomb = 3x3) into `cleared`; a special piece caught by that
-// sweep chains into the queue. Each piece fires at most once, so the chain
-// is guaranteed to terminate (spec/01 §4.3).
+// row/column, bomb = 3x3, prism = every same-kind gem on the board) into
+// `cleared`; a special piece caught by that sweep chains into the queue.
+// Each piece fires at most once, so the chain is guaranteed to terminate
+// (spec/01 §4.3).
 export function resolveSpecialFires(
   board: Board,
   initialCleared: Set<number>,
@@ -82,7 +103,7 @@ export function resolveSpecialFires(
     const special = gem.special;
     fires.push({ cell, special });
 
-    for (const sweptIndex of sweepIndicesFor(special, cell)) {
+    for (const sweptIndex of sweepIndicesFor(board, special, cell, gem.kind)) {
       cleared.add(sweptIndex);
       const sweptGem = board[sweptIndex];
       if (sweptGem && sweptGem.special !== "none" && !fired.has(sweptIndex)) {

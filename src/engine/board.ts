@@ -4,7 +4,7 @@ import type { Rng } from "./rng.ts";
 export const BOARD_SIZE = 8;
 export const GEM_KINDS = 6;
 
-export type Special = "none" | "laserH" | "laserV" | "bomb";
+export type Special = "none" | "laserH" | "laserV" | "bomb" | "prism";
 
 export interface Gem {
   id: number;

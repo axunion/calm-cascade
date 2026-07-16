@@ -8,19 +8,20 @@ export interface SpecialSpawn {
 }
 
 const MIN_LASER_LENGTH = 4;
+const MIN_PRISM_LENGTH = 5;
 
-// prism > bomb > laserH > laserV (spec/01 §4.2 rule 4). "prism" isn't a
-// Special yet (phase 11) - this rank table is the skeleton it slots into.
+// prism > bomb > laserH > laserV (spec/01 §4.2 rule 4).
 const SPECIAL_PRIORITY: Record<Exclude<Special, "none">, number> = {
+  prism: 3,
   bomb: 2,
   laserH: 1,
   laserV: 0,
 };
 
-function computeLaserSpawnCell(
-  group: MatchGroup,
-  swapTarget: Cell | null,
-): Cell {
+// Same deterministic position rule for both laser and prism (spec/01 §4.2):
+// the swap-target cell if the swap moved into this group, else a cascade
+// position (center for horizontal, bottom-most for vertical).
+function computeSpawnCell(group: MatchGroup, swapTarget: Cell | null): Cell {
   if (swapTarget) {
     const swapCell = group.cells.find((cell) => cellsEqual(cell, swapTarget));
     if (swapCell) {
@@ -62,10 +63,16 @@ function addSpawn(
 // planSpecialSpawns (spec/01 §4.1-4.2):
 // 1. Same-kind horizontal/vertical groups sharing a cell (L/T shape) spawn a
 //    bomb at that shared cell, angle fixed regardless of swapTarget, and
-//    consume both groups - they don't also spawn a laser.
-// 2. Remaining groups of length >= 4 spawn a laser at the swap-target cell
-//    (if the swap moved into this group) or a deterministic cascade
-//    position (center for horizontal, bottom-most for vertical).
+//    consume both groups - they don't also spawn a laser or prism. This
+//    check runs unconditionally on group length: a length>=5 leg involved in
+//    an L/T is still consumed into the bomb rather than emitted as a prism.
+//    spec/01 §4.1's "判定順は prism → bomb → laser" is about the priority
+//    table below (same-cell collision between independently-computed
+//    spawns), not about which check runs first here - resolved this way on
+//    purpose (phase 11) to keep phase 10's L/T behavior unchanged rather
+//    than re-reading that note as "prism preempts L/T consumption".
+// 2. Remaining groups of length >= 5 spawn a prism; length 4 spawns a laser.
+//    Both use the same spawn-position rule (computeSpawnCell).
 // 3. A cell claimed by more than one spawn keeps only the higher-priority
 //    piece (prism > bomb > laserH > laserV).
 export function planSpecialSpawns(
@@ -100,8 +107,13 @@ export function planSpecialSpawns(
     if (consumed.has(group) || group.cells.length < MIN_LASER_LENGTH) {
       continue;
     }
-    const cell = computeLaserSpawnCell(group, swapTarget);
-    const special = group.orientation === "h" ? "laserH" : "laserV";
+    const cell = computeSpawnCell(group, swapTarget);
+    const special: Exclude<Special, "none"> =
+      group.cells.length >= MIN_PRISM_LENGTH
+        ? "prism"
+        : group.orientation === "h"
+          ? "laserH"
+          : "laserV";
     addSpawn(spawns, cell, special, group.kind);
   }
 

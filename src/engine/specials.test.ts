@@ -55,11 +55,11 @@ describe("planSpecialSpawns", () => {
     ]);
   });
 
-  it("spawns exactly one laser for a 5-length line", () => {
+  it("spawns exactly one prism for a 5-length line", () => {
     const group = horizontalRun(0, 0, 5);
     const spawns = planSpecialSpawns([group], null);
     expect(spawns).toHaveLength(1);
-    expect(spawns[0].special).toBe("laserH");
+    expect(spawns[0].special).toBe("prism");
   });
 
   it("spawns only one laser, laserH, when a horizontal-4 and vertical-4 target the same cell", () => {
@@ -116,6 +116,19 @@ describe("planSpecialSpawns", () => {
     expect(planSpecialSpawns([h, v], null)).toHaveLength(1);
   });
 
+  // Locks in a deliberate phase-11 decision (see the comment above
+  // planSpecialSpawns): L/T detection runs unconditionally on group length,
+  // so a prism-eligible (length >= 5) leg of an L/T is still consumed into
+  // the bomb rather than emitted as its own prism.
+  it("consumes a length-5+ leg of an L/T into the bomb instead of spawning a prism", () => {
+    const h = horizontalRun(5, 1, 3, 2); // (5,1) (5,2) (5,3)
+    const v = verticalRun(3, 3, 5, 2); // (3,3)..(7,3), length 5, shares (5,3)
+    const spawns = planSpecialSpawns([h, v], null);
+    expect(spawns).toEqual([
+      { cell: { row: 5, col: 3 }, special: "bomb", kind: 2 },
+    ]);
+  });
+
   it("does not spawn a bomb for an intersection between different kinds", () => {
     const h = horizontalRun(2, 1, 3, 0);
     const v = verticalRun(3, 2, 3, 1);
@@ -130,6 +143,34 @@ describe("planSpecialSpawns", () => {
     const spawns = planSpecialSpawns([hBomb, vBomb, vLaser], swapTarget);
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "bomb", kind: 0 },
+    ]);
+  });
+
+  it("spawns the prism at the swap target when it is part of a 5-length line", () => {
+    const group = horizontalRun(2, 1, 5);
+    const swapTarget: Cell = { row: 2, col: 4 };
+    const spawns = planSpecialSpawns([group], swapTarget);
+    expect(spawns).toEqual([
+      { cell: { row: 2, col: 4 }, special: "prism", kind: 0 },
+    ]);
+  });
+
+  it("spawns the prism at the bottom-most cell for a cascade-origin vertical 5", () => {
+    const group = verticalRun(3, 1, 5);
+    const spawns = planSpecialSpawns([group], null);
+    expect(spawns).toEqual([
+      { cell: { row: 5, col: 3 }, special: "prism", kind: 0 },
+    ]);
+  });
+
+  it("keeps the prism when its cell collides with a bomb spawn", () => {
+    const hBomb = horizontalRun(2, 1, 3, 0); // (2,1) (2,2) (2,3)
+    const vBomb = verticalRun(3, 2, 3, 0); // (2,3) (3,3) (4,3) -> bomb at (2,3)
+    const vPrism = verticalRun(3, 0, 5, 1); // (0,3)..(4,3), length 5, different kind
+    const swapTarget: Cell = { row: 2, col: 3 };
+    const spawns = planSpecialSpawns([hBomb, vBomb, vPrism], swapTarget);
+    expect(spawns).toEqual([
+      { cell: { row: 2, col: 3 }, special: "prism", kind: 1 },
     ]);
   });
 });

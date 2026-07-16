@@ -5,12 +5,17 @@
 const PENTATONIC_HZ = [261.63, 293.66, 329.63, 392.0, 440.0];
 const LASER_SWEEP_MS = 300;
 const STOP_TAIL_SECONDS = 0.05;
+// A5 + E6, a clean perfect fifth - the "澄んだチャイム音" prism plays
+// (spec/01 §4.3), distinct from the laser's descending sweep.
+const PRISM_CHIME_HZ = [880, 1318.51];
+const PRISM_CHIME_RELEASE_SECONDS = 0.4;
 
 export interface AudioEngine {
   unlock(): void;
   setEnabled(enabled: boolean): void;
   playMatch(comboStep: number): void;
   playLaser(): void;
+  playPrism(): void;
 }
 
 export function createAudioEngine(): AudioEngine {
@@ -102,6 +107,11 @@ export function createAudioEngine(): AudioEngine {
       osc.frequency.linearRampToValueAtTime(80, now + duration);
       gain.gain.setValueAtTime(0.25, now);
       gain.gain.linearRampToValueAtTime(0.0001, now + duration);
+    },
+    playPrism() {
+      for (const freq of PRISM_CHIME_HZ) {
+        playTone(freq, PRISM_CHIME_RELEASE_SECONDS);
+      }
     },
   };
 }

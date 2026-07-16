@@ -213,3 +213,33 @@ function buildBombIconPath(cellSize: number): Path2D {
   }
   return path;
 }
+
+// Drawn on top of a prism gem's shape (spec/01 §4.3, spec/03 color-blind
+// support): a small faceted diamond, evoking cut glass - color-independent,
+// the same way gem shapes stand in for kind.
+let cachedPrismIcon: Path2D | null = null;
+let prismIconCacheCellSize = -1;
+
+export function prismIconPath(cellSize: number): Path2D {
+  if (cellSize !== prismIconCacheCellSize) {
+    cachedPrismIcon = null;
+    prismIconCacheCellSize = cellSize;
+  }
+  cachedPrismIcon ??= buildPrismIconPath(cellSize);
+  return cachedPrismIcon;
+}
+
+function buildPrismIconPath(cellSize: number): Path2D {
+  const r = cellSize * 0.16;
+  const path = new Path2D();
+  path.moveTo(0, -r);
+  path.lineTo(r, 0);
+  path.lineTo(0, r);
+  path.lineTo(-r, 0);
+  path.closePath();
+  path.moveTo(-r, 0);
+  path.lineTo(r, 0);
+  path.moveTo(0, -r);
+  path.lineTo(0, r);
+  return path;
+}

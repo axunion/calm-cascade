@@ -57,6 +57,9 @@ function PuzzleGrid(props: PuzzleGridProps) {
           if (info.lasersFired > 0) {
             audio.playLaser();
           }
+          if (info.prismsFired > 0) {
+            audio.playPrism();
+          }
           vibrateMatch(loop.settingsSnapshot.haptics, Boolean(info.juice));
         },
         onCascadeEnd() {

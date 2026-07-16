@@ -281,12 +281,16 @@ export function createGameLoop(
     const bombsDetonated = step.fires.filter(
       (fire) => fire.special === "bomb",
     ).length;
+    const prismsFired = step.fires.filter(
+      (fire) => fire.special === "prism",
+    ).length;
     callbacks.onStepResolved({
       scoreDelta,
       combo,
       gemsCleared: step.clearedGems.length,
       lasersFired,
       bombsDetonated,
+      prismsFired,
       juice,
     });
     // No reducedMotion guard here: updateShake() unconditionally zeroes
@@ -296,9 +300,11 @@ export function createGameLoop(
   }
 
   // gameLoop is the one place that converts the engine's generalized
-  // SpecialFire[] (laser + bomb, and later prism) down to the laser-only
-  // shape laserTiming.ts expects - that module's API stays laser-specific
-  // and unchanged (spec/05 phase 10).
+  // SpecialFire[] (laser, bomb, prism) down to the laser-only shape
+  // laserTiming.ts expects - that module's API stays laser-specific and
+  // unchanged (spec/05 phase 10). Prism's clear has no stagger (spec/01
+  // §4.3), so it's correctly left out of this conversion: every cell it
+  // sweeps gets the default 0 clear delay, exactly like a plain match.
   function laserFiresOf(fires: SpecialFire[]): LaserFire[] {
     const laserFires: LaserFire[] = [];
     for (const fire of fires) {

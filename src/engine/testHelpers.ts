@@ -2,18 +2,20 @@ import { BOARD_SIZE, type Board, type Gem, type Special } from "./board.ts";
 
 // Readable fixture notation for tests (spec/06 §2): one letter per gem kind,
 // '.' for an empty cell, and an optional trailing modifier for specials
-// ('>' = laserH, '^' = laserV, '*' = bomb). Each row string must expand to
-// BOARD_SIZE cells.
+// ('>' = laserH, '^' = laserV, '*' = bomb, '#' = prism). Each row string must
+// expand to BOARD_SIZE cells.
 const KIND_CHARS = ["R", "O", "Y", "G", "B", "P"];
 const SPECIAL_BY_SUFFIX: Record<string, Special> = {
   ">": "laserH",
   "^": "laserV",
   "*": "bomb",
+  "#": "prism",
 };
 const SUFFIX_BY_SPECIAL: Partial<Record<Special, string>> = {
   laserH: ">",
   laserV: "^",
   bomb: "*",
+  prism: "#",
 };
 
 // A full 8x8 board with no matches and no adjacent swap that creates one —

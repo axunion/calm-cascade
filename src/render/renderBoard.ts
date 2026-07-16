@@ -7,6 +7,7 @@ import {
   bombIconPath,
   gemShapePath,
   laserArrowPath,
+  prismIconPath,
   type Theme,
 } from "./theme.ts";
 
@@ -117,6 +118,8 @@ function drawGems(
       drawLaserArrow(ctx, sprite.special === "laserH" ? "h" : "v", cellSize);
     } else if (sprite.special === "bomb") {
       drawBombIcon(ctx, cellSize);
+    } else if (sprite.special === "prism") {
+      drawPrismIcon(ctx, cellSize);
     }
     ctx.restore();
   });
@@ -183,6 +186,17 @@ function drawBombIcon(ctx: CanvasRenderingContext2D, cellSize: number): void {
   ctx.lineWidth = Math.max(1.5, cellSize * 0.04);
   ctx.lineCap = "round";
   ctx.stroke(bombIconPath(cellSize));
+  ctx.restore();
+}
+
+// Same fixed near-white stroke as the other special icons - color-independent
+// so the faceted-diamond glyph reads over any gem color (spec/03 §6).
+function drawPrismIcon(ctx: CanvasRenderingContext2D, cellSize: number): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = Math.max(1.5, cellSize * 0.04);
+  ctx.lineCap = "round";
+  ctx.stroke(prismIconPath(cellSize));
   ctx.restore();
 }
 
