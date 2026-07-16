@@ -7,13 +7,23 @@ export interface Theme {
   boardTileB: string;
   selectionRing: string;
   gemColors: string[];
+  gems: readonly (ImageBitmap | null)[];
+  background: ImageBitmap | null;
 }
+
+// Shared across both built-in themes so the hot render loop never has to
+// optional-chain into `theme.gems` - classic is always vector-only.
+const NO_GEM_BITMAPS: readonly (ImageBitmap | null)[] = Object.freeze(
+  new Array(GEM_KINDS).fill(null),
+);
 
 const LIGHT_THEME: Theme = {
   boardTileA: "#efeaf5",
   boardTileB: "#e6dff0",
   selectionRing: "#aa3bff",
   gemColors: ["#f28b9d", "#f5b46a", "#f2d675", "#9ed6a0", "#8fc7ea", "#c6a6e0"],
+  gems: NO_GEM_BITMAPS,
+  background: null,
 };
 
 const DARK_THEME: Theme = {
@@ -21,6 +31,8 @@ const DARK_THEME: Theme = {
   boardTileB: "#262834",
   selectionRing: "#c084fc",
   gemColors: ["#e07a90", "#e0a25f", "#e0c869", "#7fbf8a", "#7ab3d9", "#b494d6"],
+  gems: NO_GEM_BITMAPS,
+  background: null,
 };
 
 export function getTheme(mode: ThemeMode): Theme {
