@@ -8,15 +8,27 @@ export interface PuzzleStats {
   gemsCleared: number;
   lasersFired: number;
   gamesShuffled: number;
+  bombsDetonated: number;
+  prismsFired: number;
+  iceBroken: number;
+  dailiesPlayed: number;
 }
+
+export const DEFAULT_SKIN = "classic";
 
 export interface PuzzleSettings {
   theme: ThemeMode;
+  skin: string;
   reducedMotion: boolean;
   haptics: boolean;
   colorBlindShapes: boolean;
   sound: boolean;
   particles: boolean;
+}
+
+export interface DailyRecord {
+  date: string;
+  bestScore: number;
 }
 
 export interface JuiceEvent {
@@ -33,6 +45,8 @@ export interface PuzzleState {
   stats: PuzzleStats;
   settings: PuzzleSettings;
   juiceEvents: JuiceEvent[];
+  unlockedAchievements: string[];
+  daily: DailyRecord | null;
 }
 
 function prefersDarkTheme(): boolean {
@@ -62,9 +76,14 @@ function createDefaultState(): PuzzleState {
       gemsCleared: 0,
       lasersFired: 0,
       gamesShuffled: 0,
+      bombsDetonated: 0,
+      prismsFired: 0,
+      iceBroken: 0,
+      dailiesPlayed: 0,
     },
     settings: {
       theme: prefersDarkTheme() ? "dark" : "light",
+      skin: DEFAULT_SKIN,
       reducedMotion: prefersReducedMotion(),
       haptics: true,
       colorBlindShapes: false,
@@ -72,6 +91,8 @@ function createDefaultState(): PuzzleState {
       particles: true,
     },
     juiceEvents: [],
+    unlockedAchievements: [],
+    daily: null,
   };
 }
 

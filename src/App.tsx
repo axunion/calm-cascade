@@ -13,12 +13,14 @@ function App() {
   const store = createPuzzleStore();
   const [state, setState] = store;
 
-  // spec/02 §7: load once at store creation; settings/stats only (score and
-  // combo are session-only).
+  // spec/02 §7: load once at store creation; settings/stats/unlocks/daily
+  // only (score and combo are session-only).
   const persisted = loadPersistedState(localStorage);
   if (persisted) {
     setState("settings", persisted.settings);
     setState("stats", persisted.stats);
+    setState("unlockedAchievements", persisted.unlockedAchievements);
+    setState("daily", persisted.daily);
   }
 
   const scheduleSave = createDebouncedSave(localStorage);
@@ -26,6 +28,8 @@ function App() {
     scheduleSave({
       settings: { ...state.settings },
       stats: { ...state.stats },
+      unlockedAchievements: [...state.unlockedAchievements],
+      daily: state.daily,
     });
   });
 

@@ -21,6 +21,7 @@ function createMemoryStorage(): StorageLike & { data: Map<string, string> } {
 const samplePersisted: PersistedState = {
   settings: {
     theme: "dark",
+    skin: "classic",
     reducedMotion: false,
     haptics: true,
     colorBlindShapes: false,
@@ -33,7 +34,13 @@ const samplePersisted: PersistedState = {
     gemsCleared: 30,
     lasersFired: 2,
     gamesShuffled: 1,
+    bombsDetonated: 3,
+    prismsFired: 1,
+    iceBroken: 5,
+    dailiesPlayed: 2,
   },
+  unlockedAchievements: ["ripple"],
+  daily: { date: "2026-07-16", bestScore: 500 },
 };
 
 describe("loadPersistedState", () => {
@@ -66,10 +73,74 @@ describe("loadPersistedState", () => {
     expect(loadPersistedState(storage)).toBeNull();
   });
 
-  it("returns settings and stats from a valid payload", () => {
+  it("returns settings and stats from a valid v2 payload", () => {
     const storage = createMemoryStorage();
     savePersistedState(storage, samplePersisted);
     expect(loadPersistedState(storage)).toEqual(samplePersisted);
+  });
+
+  it("migrates a v1 payload by filling in the v2 defaults", () => {
+    const storage = createMemoryStorage();
+    storage.data.set(
+      "calm-cascade/v1",
+      JSON.stringify({
+        version: 1,
+        settings: {
+          theme: "dark",
+          reducedMotion: false,
+          haptics: true,
+          colorBlindShapes: false,
+          sound: true,
+          particles: true,
+        },
+        stats: {
+          totalScore: 120,
+          bestCombo: 4,
+          gemsCleared: 30,
+          lasersFired: 2,
+          gamesShuffled: 1,
+        },
+      }),
+    );
+    expect(loadPersistedState(storage)).toEqual({
+      settings: {
+        theme: "dark",
+        skin: "classic",
+        reducedMotion: false,
+        haptics: true,
+        colorBlindShapes: false,
+        sound: true,
+        particles: true,
+      },
+      stats: {
+        totalScore: 120,
+        bestCombo: 4,
+        gemsCleared: 30,
+        lasersFired: 2,
+        gamesShuffled: 1,
+        bombsDetonated: 0,
+        prismsFired: 0,
+        iceBroken: 0,
+        dailiesPlayed: 0,
+      },
+      unlockedAchievements: [],
+      daily: null,
+    });
+  });
+
+  it("falls back to an empty array when unlockedAchievements is corrupted", () => {
+    const storage = createMemoryStorage();
+    storage.data.set(
+      "calm-cascade/v1",
+      JSON.stringify({
+        version: 2,
+        settings: samplePersisted.settings,
+        stats: samplePersisted.stats,
+        unlockedAchievements: "not-an-array",
+        daily: null,
+      }),
+    );
+    expect(loadPersistedState(storage)?.unlockedAchievements).toEqual([]);
   });
 });
 
@@ -80,7 +151,7 @@ describe("savePersistedState", () => {
     const raw = storage.data.get("calm-cascade/v1");
     expect(raw).toBeDefined();
     expect(JSON.parse(raw as string)).toEqual({
-      version: 1,
+      version: 2,
       ...samplePersisted,
     });
   });
