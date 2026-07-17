@@ -104,13 +104,20 @@ function drawGems(
     if (gemImage) {
       const size = cellSize * 0.9;
       ctx.drawImage(gemImage, -size / 2, -size / 2, size, size);
-      if (colorBlindShapes) {
-        drawGemGlyph(ctx, sprite.kind, cellSize);
-      }
     } else {
       ctx.fillStyle = theme.gemColors[sprite.kind];
       ctx.fill(gemShapePath(sprite.kind, cellSize));
-      if (colorBlindShapes) {
+    }
+    // Frost sits between the gem body and the color-blind cue - drawing it
+    // first keeps the cue as the top-most layer so a frosted gem doesn't
+    // lose the very cue that makes it legible without color (spec/03 §6).
+    if (sprite.ice > 0) {
+      drawFrost(ctx, cellSize);
+    }
+    if (colorBlindShapes) {
+      if (gemImage) {
+        drawGemGlyph(ctx, sprite.kind, cellSize);
+      } else {
         drawGemOutline(ctx, sprite.kind, cellSize);
       }
     }
@@ -123,6 +130,17 @@ function drawGems(
     }
     ctx.restore();
   });
+}
+
+// A translucent frost coat over the whole gem (spec/01 §7) - ice and special
+// never coexist, so this never has to compose with an icon.
+function drawFrost(ctx: CanvasRenderingContext2D, cellSize: number): void {
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+  ctx.beginPath();
+  ctx.arc(0, 0, cellSize * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // spec/03 §6 color-blind support, vector branch: stroke the same Path2D used

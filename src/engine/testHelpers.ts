@@ -1,9 +1,10 @@
 import { BOARD_SIZE, type Board, type Gem, type Special } from "./board.ts";
 
 // Readable fixture notation for tests (spec/06 §2): one letter per gem kind,
-// '.' for an empty cell, and an optional trailing modifier for specials
-// ('>' = laserH, '^' = laserV, '*' = bomb, '#' = prism). Each row string must
-// expand to BOARD_SIZE cells.
+// '.' for an empty cell, and an optional trailing modifier - either a
+// special suffix ('>' = laserH, '^' = laserV, '*' = bomb, '#' = prism) or a
+// digit for ice layers ('1' = 1 layer, '2' = 2 layers; ice and special never
+// coexist, spec/01 §7). Each row string must expand to BOARD_SIZE cells.
 const KIND_CHARS = ["R", "O", "Y", "G", "B", "P"];
 const SPECIAL_BY_SUFFIX: Record<string, Special> = {
   ">": "laserH",
@@ -54,11 +55,16 @@ export function boardFromStrings(rows: string[]): Board {
         throw new Error(`Unknown gem character: ${ch}`);
       }
       const suffix = row[i + 1];
-      const special = SPECIAL_BY_SUFFIX[suffix] ?? "none";
-      if (special !== "none") {
+      let special: Special = "none";
+      let ice = 0;
+      if (suffix in SPECIAL_BY_SUFFIX) {
+        special = SPECIAL_BY_SUFFIX[suffix];
+        i++;
+      } else if (suffix >= "0" && suffix <= "9") {
+        ice = Number(suffix);
         i++;
       }
-      cells.push({ id: fixtureId++, kind, special, ice: 0 });
+      cells.push({ id: fixtureId++, kind, special, ice });
     }
     if (cells.length !== BOARD_SIZE) {
       throw new Error(
@@ -80,7 +86,9 @@ export function boardToStrings(board: Board): string[] {
         line += ".";
         continue;
       }
-      line += KIND_CHARS[gem.kind] + (SUFFIX_BY_SPECIAL[gem.special] ?? "");
+      const suffix =
+        SUFFIX_BY_SPECIAL[gem.special] ?? (gem.ice > 0 ? String(gem.ice) : "");
+      line += KIND_CHARS[gem.kind] + suffix;
     }
     rows.push(line);
   }

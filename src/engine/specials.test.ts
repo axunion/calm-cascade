@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { Cell } from "./board.ts";
+import { BOARD_SIZE, type Board, type Cell, idx } from "./board.ts";
 import type { MatchGroup } from "./matches.ts";
 import { planSpecialSpawns } from "./specials.ts";
+
+// planSpecialSpawns only reads this board to check ice at candidate cells;
+// an empty board reads as "no gem, no ice" everywhere, which is exactly
+// what most of these tests want. Ice-specific tests below build a real one.
+const NO_ICE_BOARD: Board = [];
+
+function boardWithIceAt(cell: Cell): Board {
+  const board: Board = new Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+  board[idx(cell.row, cell.col)] = { id: 0, kind: 0, special: "none", ice: 1 };
+  return board;
+}
 
 function horizontalRun(
   row: number,
@@ -33,7 +44,7 @@ describe("planSpecialSpawns", () => {
   it("spawns at the swap target when it is part of a horizontal 4", () => {
     const group = horizontalRun(2, 1, 4);
     const swapTarget: Cell = { row: 2, col: 3 };
-    const spawns = planSpecialSpawns([group], swapTarget);
+    const spawns = planSpecialSpawns([group], swapTarget, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "laserH", kind: 0 },
     ]);
@@ -41,7 +52,7 @@ describe("planSpecialSpawns", () => {
 
   it("spawns at the center cell for a cascade-origin horizontal 4", () => {
     const group = horizontalRun(2, 1, 4);
-    const spawns = planSpecialSpawns([group], null);
+    const spawns = planSpecialSpawns([group], null, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "laserH", kind: 0 },
     ]);
@@ -49,7 +60,7 @@ describe("planSpecialSpawns", () => {
 
   it("spawns at the bottom-most cell for a cascade-origin vertical 4", () => {
     const group = verticalRun(3, 1, 4);
-    const spawns = planSpecialSpawns([group], null);
+    const spawns = planSpecialSpawns([group], null, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 4, col: 3 }, special: "laserV", kind: 0 },
     ]);
@@ -57,7 +68,7 @@ describe("planSpecialSpawns", () => {
 
   it("spawns exactly one prism for a 5-length line", () => {
     const group = horizontalRun(0, 0, 5);
-    const spawns = planSpecialSpawns([group], null);
+    const spawns = planSpecialSpawns([group], null, NO_ICE_BOARD);
     expect(spawns).toHaveLength(1);
     expect(spawns[0].special).toBe("prism");
   });
@@ -68,7 +79,7 @@ describe("planSpecialSpawns", () => {
     // Both candidate spawn cells collide at {row:5, col:3}.
     const h = horizontalRun(5, 1, 4, 1);
     const v = verticalRun(3, 2, 4, 2);
-    const spawns = planSpecialSpawns([h, v], null);
+    const spawns = planSpecialSpawns([h, v], null, NO_ICE_BOARD);
     expect(spawns).toHaveLength(1);
     expect(spawns[0]).toEqual({
       cell: { row: 5, col: 3 },
@@ -79,13 +90,13 @@ describe("planSpecialSpawns", () => {
 
   it("ignores groups shorter than 4", () => {
     const group = horizontalRun(0, 0, 3);
-    expect(planSpecialSpawns([group], null)).toHaveLength(0);
+    expect(planSpecialSpawns([group], null, NO_ICE_BOARD)).toHaveLength(0);
   });
 
   it("spawns a bomb at the shared cell for an L-shaped same-kind intersection", () => {
     const h = horizontalRun(2, 1, 3, 0); // (2,1) (2,2) (2,3)
     const v = verticalRun(3, 2, 3, 0); // (2,3) (3,3) (4,3)
-    const spawns = planSpecialSpawns([h, v], null);
+    const spawns = planSpecialSpawns([h, v], null, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "bomb", kind: 0 },
     ]);
@@ -95,7 +106,7 @@ describe("planSpecialSpawns", () => {
     const h = horizontalRun(2, 1, 3, 0);
     const v = verticalRun(3, 2, 3, 0);
     const swapTarget: Cell = { row: 2, col: 1 };
-    const spawns = planSpecialSpawns([h, v], swapTarget);
+    const spawns = planSpecialSpawns([h, v], swapTarget, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "bomb", kind: 0 },
     ]);
@@ -104,7 +115,7 @@ describe("planSpecialSpawns", () => {
   it("spawns a bomb for a 4+3 same-kind intersection", () => {
     const h = horizontalRun(5, 1, 4, 2); // (5,1)..(5,4)
     const v = verticalRun(4, 3, 3, 2); // (3,4) (4,4) (5,4)
-    const spawns = planSpecialSpawns([h, v], null);
+    const spawns = planSpecialSpawns([h, v], null, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 5, col: 4 }, special: "bomb", kind: 2 },
     ]);
@@ -113,7 +124,7 @@ describe("planSpecialSpawns", () => {
   it("does not also spawn a laser from groups consumed by a bomb", () => {
     const h = horizontalRun(5, 1, 4, 2);
     const v = verticalRun(4, 3, 3, 2);
-    expect(planSpecialSpawns([h, v], null)).toHaveLength(1);
+    expect(planSpecialSpawns([h, v], null, NO_ICE_BOARD)).toHaveLength(1);
   });
 
   // Locks in a deliberate phase-11 decision (see the comment above
@@ -123,7 +134,7 @@ describe("planSpecialSpawns", () => {
   it("consumes a length-5+ leg of an L/T into the bomb instead of spawning a prism", () => {
     const h = horizontalRun(5, 1, 3, 2); // (5,1) (5,2) (5,3)
     const v = verticalRun(3, 3, 5, 2); // (3,3)..(7,3), length 5, shares (5,3)
-    const spawns = planSpecialSpawns([h, v], null);
+    const spawns = planSpecialSpawns([h, v], null, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 5, col: 3 }, special: "bomb", kind: 2 },
     ]);
@@ -132,7 +143,7 @@ describe("planSpecialSpawns", () => {
   it("does not spawn a bomb for an intersection between different kinds", () => {
     const h = horizontalRun(2, 1, 3, 0);
     const v = verticalRun(3, 2, 3, 1);
-    expect(planSpecialSpawns([h, v], null)).toHaveLength(0);
+    expect(planSpecialSpawns([h, v], null, NO_ICE_BOARD)).toHaveLength(0);
   });
 
   it("keeps the bomb when its cell collides with an independently-computed laser spawn", () => {
@@ -140,7 +151,11 @@ describe("planSpecialSpawns", () => {
     const vBomb = verticalRun(3, 2, 3, 0); // (2,3) (3,3) (4,3) -> bomb at (2,3)
     const vLaser = verticalRun(3, 0, 4, 1); // (0,3)..(3,3), different kind
     const swapTarget: Cell = { row: 2, col: 3 };
-    const spawns = planSpecialSpawns([hBomb, vBomb, vLaser], swapTarget);
+    const spawns = planSpecialSpawns(
+      [hBomb, vBomb, vLaser],
+      swapTarget,
+      NO_ICE_BOARD,
+    );
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "bomb", kind: 0 },
     ]);
@@ -149,7 +164,7 @@ describe("planSpecialSpawns", () => {
   it("spawns the prism at the swap target when it is part of a 5-length line", () => {
     const group = horizontalRun(2, 1, 5);
     const swapTarget: Cell = { row: 2, col: 4 };
-    const spawns = planSpecialSpawns([group], swapTarget);
+    const spawns = planSpecialSpawns([group], swapTarget, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 2, col: 4 }, special: "prism", kind: 0 },
     ]);
@@ -157,7 +172,7 @@ describe("planSpecialSpawns", () => {
 
   it("spawns the prism at the bottom-most cell for a cascade-origin vertical 5", () => {
     const group = verticalRun(3, 1, 5);
-    const spawns = planSpecialSpawns([group], null);
+    const spawns = planSpecialSpawns([group], null, NO_ICE_BOARD);
     expect(spawns).toEqual([
       { cell: { row: 5, col: 3 }, special: "prism", kind: 0 },
     ]);
@@ -168,9 +183,26 @@ describe("planSpecialSpawns", () => {
     const vBomb = verticalRun(3, 2, 3, 0); // (2,3) (3,3) (4,3) -> bomb at (2,3)
     const vPrism = verticalRun(3, 0, 5, 1); // (0,3)..(4,3), length 5, different kind
     const swapTarget: Cell = { row: 2, col: 3 };
-    const spawns = planSpecialSpawns([hBomb, vBomb, vPrism], swapTarget);
+    const spawns = planSpecialSpawns(
+      [hBomb, vBomb, vPrism],
+      swapTarget,
+      NO_ICE_BOARD,
+    );
     expect(spawns).toEqual([
       { cell: { row: 2, col: 3 }, special: "prism", kind: 1 },
     ]);
+  });
+
+  it("does not spawn a laser when the candidate cell is ice-covered", () => {
+    const group = horizontalRun(2, 1, 4);
+    const board = boardWithIceAt({ row: 2, col: 3 }); // the group's center cell
+    expect(planSpecialSpawns([group], null, board)).toHaveLength(0);
+  });
+
+  it("does not spawn a bomb when the shared corner is ice-covered", () => {
+    const h = horizontalRun(2, 1, 3, 0);
+    const v = verticalRun(3, 2, 3, 0); // shares (2,3)
+    const board = boardWithIceAt({ row: 2, col: 3 });
+    expect(planSpecialSpawns([h, v], null, board)).toHaveLength(0);
   });
 });

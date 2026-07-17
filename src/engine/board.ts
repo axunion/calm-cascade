@@ -92,6 +92,11 @@ function wouldSwapMatch(board: Board, a: Cell, b: Cell): boolean {
   if (!gemA || !gemB) {
     return false;
   }
+  // spec/01 §7: an ice-covered gem can't move, so it never counts toward a
+  // valid move, even in a configuration that would otherwise match.
+  if (gemA.ice > 0 || gemB.ice > 0) {
+    return false;
+  }
   if (isSpecialPair(gemA, gemB)) {
     return true;
   }

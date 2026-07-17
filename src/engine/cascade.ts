@@ -27,6 +27,12 @@ export interface Spawn {
   fromAboveRows: number;
 }
 
+export interface IceBreak {
+  cell: Cell;
+  gem: Gem;
+  remaining: number;
+}
+
 export interface StepResult {
   board: Board;
   clearedGems: { cell: Cell; gem: Gem }[];
@@ -35,6 +41,7 @@ export interface StepResult {
   falls: Fall[];
   spawns: Spawn[];
   matchGroups: MatchGroup[];
+  iceBreaks: IceBreak[];
 }
 
 // A swap involves two cells; unlike a plain Cell | null "which cell moved"
@@ -141,7 +148,7 @@ export function resolveStep(
   }
 
   const swapTarget = swap ? pickSwapTarget(matchGroups, swap) : null;
-  const specialSpawns = planSpecialSpawns(matchGroups, swapTarget);
+  const specialSpawns = planSpecialSpawns(matchGroups, swapTarget, board);
   const spawnIndices = new Set(
     specialSpawns.map((spawn) => idx(spawn.cell.row, spawn.cell.col)),
   );
@@ -163,16 +170,28 @@ export function resolveStep(
 
   const { cleared, fires } = resolveSpecialFires(board, initialCleared);
 
+  // spec/01 §7: an ice-covered gem never clears directly - a clear it's
+  // caught in (match, beam, bomb, prism - the rule is the same for all)
+  // removes one layer instead, and the gem stays put. It only actually
+  // clears once its own ice reaches 0 and gets caught in a later clear.
   const clearedGems: { cell: Cell; gem: Gem }[] = [];
+  const iceBreaks: IceBreak[] = [];
   const working: Board = board.slice();
   for (const cellIndex of cleared) {
     if (spawnIndices.has(cellIndex)) {
       continue;
     }
     const gem = board[cellIndex];
-    if (gem) {
-      clearedGems.push({ cell: cellFromIndex(cellIndex), gem });
+    if (!gem) {
+      continue;
     }
+    if (gem.ice > 0) {
+      const remaining = gem.ice - 1;
+      iceBreaks.push({ cell: cellFromIndex(cellIndex), gem, remaining });
+      working[cellIndex] = { ...gem, ice: remaining };
+      continue;
+    }
+    clearedGems.push({ cell: cellFromIndex(cellIndex), gem });
     working[cellIndex] = null;
   }
 
@@ -195,5 +214,6 @@ export function resolveStep(
     falls,
     spawns,
     matchGroups,
+    iceBreaks,
   };
 }

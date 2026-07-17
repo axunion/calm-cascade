@@ -156,6 +156,110 @@ describe("resolveStep", () => {
   });
 });
 
+describe("ice", () => {
+  it("keeps a 1-layer ice gem on the board with remaining: 0 instead of clearing it", () => {
+    const board = boardFromStrings([
+      "RR1RGBPYO", // (0,0)=R (0,1)=R+ice1 (0,2)=R -> horizontal 3-match
+      "OYGBPROY",
+      "YGBPROYG",
+      "GBPROYGB",
+      "BPROYGBP",
+      "PROYGBPR",
+      "ROYGBPRO",
+      "OYGBPROY",
+    ]);
+    const result = resolveStep(board, mulberry32(1), createIdGenerator(), null);
+
+    expect(result).not.toBeNull();
+    expect(
+      result?.clearedGems.some((c) => c.cell.row === 0 && c.cell.col === 1),
+    ).toBe(false);
+    expect(result?.iceBreaks).toEqual([
+      {
+        cell: { row: 0, col: 1 },
+        gem: expect.objectContaining({ kind: 0, ice: 1 }),
+        remaining: 0,
+      },
+    ]);
+    expect(result?.board[idx(0, 1)]).toMatchObject({ kind: 0, ice: 0 });
+  });
+
+  it("decrements one layer per clear: 2 -> 1 -> 0 -> cleared", () => {
+    const rowWith = (suffix: string) => [
+      `RR${suffix}RGBPYO`,
+      "OYGBPROY",
+      "YGBPROYG",
+      "GBPROYGB",
+      "BPROYGBP",
+      "PROYGBPR",
+      "ROYGBPRO",
+      "OYGBPROY",
+    ];
+
+    const step1 = resolveStep(
+      boardFromStrings(rowWith("2")),
+      mulberry32(1),
+      createIdGenerator(),
+      null,
+    );
+    expect(step1?.iceBreaks).toEqual([
+      {
+        cell: { row: 0, col: 1 },
+        gem: expect.objectContaining({ ice: 2 }),
+        remaining: 1,
+      },
+    ]);
+
+    const step2 = resolveStep(
+      boardFromStrings(rowWith("1")),
+      mulberry32(1),
+      createIdGenerator(),
+      null,
+    );
+    expect(step2?.iceBreaks).toEqual([
+      {
+        cell: { row: 0, col: 1 },
+        gem: expect.objectContaining({ ice: 1 }),
+        remaining: 0,
+      },
+    ]);
+
+    const step3 = resolveStep(
+      boardFromStrings(rowWith("")),
+      mulberry32(1),
+      createIdGenerator(),
+      null,
+    );
+    expect(step3?.iceBreaks).toHaveLength(0);
+    expect(
+      step3?.clearedGems.some((c) => c.cell.row === 0 && c.cell.col === 1),
+    ).toBe(true);
+  });
+
+  it("applies the same one-layer-per-clear rule to a gem swept by a laser beam", () => {
+    const board = boardFromStrings([
+      "ROYGBPRO",
+      "OYGBPROY",
+      "R>OYGB1PYO", // laserH at (2,0); (2,4) has 1 ice layer
+      "RYGBPROY",
+      "RGBPROYG",
+      "GBPROYGB",
+      "BPROYGBP",
+      "PROYGBPR",
+    ]);
+    const result = resolveStep(board, mulberry32(1), createIdGenerator(), null);
+
+    expect(result).not.toBeNull();
+    expect(
+      result?.clearedGems.some((c) => c.cell.row === 2 && c.cell.col === 4),
+    ).toBe(false);
+    const iceBreak = result?.iceBreaks.find(
+      (b) => b.cell.row === 2 && b.cell.col === 4,
+    );
+    expect(iceBreak).toMatchObject({ remaining: 0 });
+  });
+});
+
 describe("3-chain scenario", () => {
   it("accumulates score as 10 x cleared x combo across a real multi-step cascade", () => {
     let foundSteps: StepResult[] | null = null;

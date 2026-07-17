@@ -4,7 +4,10 @@ import {
   createIdGenerator,
   type NextId,
 } from "../engine/board.ts";
+import { placeIce } from "../engine/ice.ts";
 import { mulberry32, type Rng, seedFromString } from "../engine/rng.ts";
+
+const DAILY_ICE_COUNT = 6;
 
 // spec/01 §8: the only place in the codebase that reads the real date -
 // engine and store code always take an already-derived date key or seed.
@@ -22,13 +25,13 @@ export interface DailyRun {
 }
 
 // Deterministic from dateKey alone (spec/02 §3): same day -> same initial
-// board and the same refill stream thereafter, for anyone, any time. Ice
-// placement lands in phase 14 - createBoard alone already guarantees no
-// initial match and at least one valid move.
+// board (frost decoration included) and the same refill stream thereafter,
+// for anyone, any time. placeIce continues the same rng stream so it stays
+// part of the single deterministic sequence.
 export function createDailyRun(dateKey: string): DailyRun {
   const rng = mulberry32(seedFromString(`daily:${dateKey}`));
   const nextId = createIdGenerator();
-  const board = createBoard(rng, nextId);
+  const board = placeIce(createBoard(rng, nextId), rng, DAILY_ICE_COUNT);
   return { board, rng, nextId };
 }
 

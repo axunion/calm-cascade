@@ -77,6 +77,24 @@ describe("hasValidMove", () => {
     ]);
     expect(hasValidMove(board)).toBe(true);
   });
+
+  it("does not count an ice-involved swap as a valid move, even the board's only one", () => {
+    // Same board as "returns true when an adjacent swap would complete a
+    // vertical match", but (1,0) now carries 1 ice layer - spec/01 §7: an
+    // ice-covered gem can't move, so this board's only valid move no longer
+    // counts.
+    const board = boardFromStrings([
+      "ROYGBPRO",
+      "O1RGBPROY",
+      "RYBPROYG",
+      "GBPROYGB",
+      "BPROYGBP",
+      "PROYGBPR",
+      "ROYGBPRO",
+      "OYGBPROY",
+    ]);
+    expect(hasValidMove(board)).toBe(false);
+  });
 });
 
 describe("reshuffle", () => {

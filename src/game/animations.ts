@@ -10,6 +10,7 @@ export interface Sprite {
   alpha: number;
   kind: number;
   special: Special;
+  ice: number;
 }
 
 export type TweenProp = "x" | "y" | "scale" | "alpha";

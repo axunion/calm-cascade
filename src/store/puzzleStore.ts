@@ -124,6 +124,7 @@ export interface StepResultInput {
   lasersFired: number;
   bombsDetonated: number;
   prismsFired: number;
+  iceBroken: number;
   juice: JuiceEvent | null;
 }
 
@@ -178,6 +179,9 @@ export function applyStepResult(
     }
     if (step.prismsFired > 0) {
       setStore("stats", "prismsFired", (count) => count + step.prismsFired);
+    }
+    if (step.iceBroken > 0) {
+      setStore("stats", "iceBroken", (count) => count + step.iceBroken);
     }
     if (step.juice) {
       const juice = step.juice;

@@ -73,6 +73,24 @@ describe("isValidSwap", () => {
       false,
     );
   });
+
+  it("is invalid when one gem has ice, even in a configuration that would match", () => {
+    // Same layout as "is valid when adjacent and a match results", but (1,0)
+    // now carries 1 ice layer - spec/01 §7: ice > 0 can't move, period.
+    const board = boardFromStrings([
+      "ROYGBPRO",
+      "O1RGBPROY",
+      "RYBPROYG",
+      "GBPROYGB",
+      "BPROYGBP",
+      "PROYGBPR",
+      "ROYGBPRO",
+      "OYGBPROY",
+    ]);
+    expect(isValidSwap(board, { row: 1, col: 0 }, { row: 1, col: 1 })).toBe(
+      false,
+    );
+  });
 });
 
 describe("applySwap", () => {

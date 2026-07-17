@@ -1,4 +1,10 @@
-import { type Cell, cellsEqual, type Special } from "./board.ts";
+import {
+  type Board,
+  type Cell,
+  cellsEqual,
+  idx,
+  type Special,
+} from "./board.ts";
 import type { MatchGroup } from "./matches.ts";
 
 export interface SpecialSpawn {
@@ -75,12 +81,20 @@ function addSpawn(
 //    Both use the same spawn-position rule (computeSpawnCell).
 // 3. A cell claimed by more than one spawn keeps only the higher-priority
 //    piece (prism > bomb > laserH > laserV).
+// 4. An ice-covered candidate cell never spawns a special (spec/01 §7) - the
+//    group is still consumed/skipped, it just doesn't produce a piece.
 export function planSpecialSpawns(
   matchGroups: MatchGroup[],
   swapTarget: Cell | null,
+  board: Board,
 ): SpecialSpawn[] {
   const spawns: SpecialSpawn[] = [];
   const consumed = new Set<MatchGroup>();
+
+  function hasIce(cell: Cell): boolean {
+    const gem = board[idx(cell.row, cell.col)];
+    return !!gem && gem.ice > 0;
+  }
 
   const horizontals = matchGroups.filter((group) => group.orientation === "h");
   const verticals = matchGroups.filter((group) => group.orientation === "v");
@@ -97,7 +111,9 @@ export function planSpecialSpawns(
       if (shared) {
         consumed.add(h);
         consumed.add(v);
-        addSpawn(spawns, shared, "bomb", h.kind);
+        if (!hasIce(shared)) {
+          addSpawn(spawns, shared, "bomb", h.kind);
+        }
         break;
       }
     }
@@ -108,6 +124,9 @@ export function planSpecialSpawns(
       continue;
     }
     const cell = computeSpawnCell(group, swapTarget);
+    if (hasIce(cell)) {
+      continue;
+    }
     const special: Exclude<Special, "none"> =
       group.cells.length >= MIN_PRISM_LENGTH
         ? "prism"

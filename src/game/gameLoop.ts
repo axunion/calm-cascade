@@ -95,6 +95,7 @@ function spriteFromGem(gem: Gem, row: number, col: number): Sprite {
     alpha: 1,
     kind: gem.kind,
     special: gem.special,
+    ice: gem.ice,
   };
 }
 
@@ -298,6 +299,7 @@ export function createGameLoop(
       lasersFired,
       bombsDetonated,
       prismsFired,
+      iceBroken: step.iceBreaks.length,
       juice,
     });
     // No reducedMotion guard here: updateShake() unconditionally zeroes
@@ -383,6 +385,17 @@ export function createGameLoop(
         const delay = clearDelays.get(idx(cell.row, cell.col)) ?? 0;
         queueClearTween(sprite, gem.id, t, delay);
         maxDuration = Math.max(maxDuration, delay + t.clearAlpha);
+      }
+      if (spawnParticles) {
+        particles.burst(cell.col, cell.row, gem.kind);
+      }
+    }
+    // An ice break decrements the sprite's frost layer in place - the gem
+    // itself never clears or moves this step (spec/01 §7).
+    for (const { cell, gem, remaining } of step.iceBreaks) {
+      const sprite = sprites.get(gem.id);
+      if (sprite) {
+        sprite.ice = remaining;
       }
       if (spawnParticles) {
         particles.burst(cell.col, cell.row, gem.kind);
